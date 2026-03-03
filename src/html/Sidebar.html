@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      font-size: 13px;
+      color: #333;
+      padding: 16px;
+      background: #fafafa;
+    }
+
+    .header {
+      text-align: center;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #4285f4;
+      margin-bottom: 16px;
+    }
+    .header h2 { font-size: 16px; color: #4285f4; }
+
+    .info-card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .info-card .label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 2px;
+    }
+    .info-card .value {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .info-row .label { flex: 0 0 70px; color: #666; }
+    .info-row .val { flex: 1; text-align: right; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .status-작성중 { background: #9e9e9e; }
+    .status-검토중 { background: #ff9800; }
+    .status-서명대기 { background: #2196f3; }
+    .status-완료 { background: #4caf50; }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-generate { background: #4285f4; color: #fff; }
+    .btn-preview { background: #fff; color: #4285f4; border: 2px solid #4285f4; }
+    .btn-email { background: #34a853; color: #fff; }
+    .btn-sign { background: #ea4335; color: #fff; }
+    .btn-refresh { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+
+    .check-list {
+      list-style: none;
+      padding: 0;
+    }
+    .check-list li {
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .check-icon { font-size: 16px; }
+    .check-done { color: #4caf50; }
+    .check-pending { color: #ccc; }
+
+    #message {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      display: none;
+    }
+    .msg-success { background: #e8f5e9; color: #2e7d32; }
+    .msg-error { background: #fce4ec; color: #c62828; }
+    .msg-info { background: #e3f2fd; color: #1565c0; }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>계약서 작업</h2>
+  </div>
+
+  <div id="loading" class="loading">정보를 불러오는 중...</div>
+
+  <div id="content" style="display:none;">
+    <!-- 계약 정보 요약 -->
+    <div class="info-card">
+      <div class="info-row">
+        <span class="label">임대인</span>
+        <span class="val" id="landlordName">-</span>
+      </div>
+      <div class="info-row">
+        <span class="label">임차인</span>
+        <span class="val" id="tenantName">-</span>
+      </div>
+      <div class="info-row">
+        <span class="label">소재지</span>
+        <span class="val" id="propertyAddr">-</span>
+      </div>
+      <div class="info-row">
+        <span class="label">보증금</span>
+        <span class="val" id="deposit">-</span>
+      </div>
+      <div class="info-row">
+        <span class="label">월세</span>
+        <span class="val" id="monthlyRent">-</span>
+      </div>
+      <div class="info-row">
+        <span class="label">상태</span>
+        <span class="val"><span class="status-badge" id="statusBadge">-</span></span>
+      </div>
+    </div>
+
+    <!-- 액션 버튼 -->
+    <div class="btn-group">
+      <button class="btn btn-generate" id="btnGenerate" onclick="doGenerate()">
+        계약서 생성
+      </button>
+      <button class="btn btn-preview" id="btnPreview" onclick="doPreview()" disabled>
+        미리보기 (Google Docs)
+      </button>
+      <button class="btn btn-email" id="btnEmail" onclick="doSendEmail()" disabled>
+        이메일 발송
+      </button>
+      <button class="btn btn-sign" id="btnSign" onclick="doLandlordSign()" disabled>
+        임대인 서명
+      </button>
+    </div>
+
+    <!-- 진행 상태 체크리스트 -->
+    <ul class="check-list">
+      <li>
+        <span class="check-icon" id="chkGenerate">&#9744;</span>
+        계약서 생성
+      </li>
+      <li>
+        <span class="check-icon" id="chkEmail">&#9744;</span>
+        이메일 발송
+      </li>
+      <li>
+        <span class="check-icon" id="chkLandlord">&#9744;</span>
+        임대인 서명
+      </li>
+      <li>
+        <span class="check-icon" id="chkTenant">&#9744;</span>
+        임차인 서명
+      </li>
+    </ul>
+
+    <button class="btn btn-refresh" onclick="loadData()" style="width:100%; margin-top: 12px;">
+      새로고침
+    </button>
+  </div>
+
+  <div id="message"></div>
+
+  <script>
+    var currentData = null;
+
+    // 페이지 로드 시 데이터 가져오기
+    window.onload = function() {
+      loadData();
+    };
+
+    function loadData() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(onError)
+        .getSelectedRowSummary();
+    }
+
+    function onDataLoaded(data) {
+      currentData = data;
+      showLoading(false);
+
+      // 정보 표시
+      document.getElementById('landlordName').textContent = data.landlordName;
+      document.getElementById('tenantName').textContent = data.tenantName;
+      document.getElementById('propertyAddr').textContent =
+        data.propertyAddress + (data.unitNumber ? ' ' + data.unitNumber : '');
+      document.getElementById('deposit').textContent = data.deposit + '원';
+      document.getElementById('monthlyRent').textContent = data.monthlyRent + '원';
+
+      // 상태 뱃지
+      var badge = document.getElementById('statusBadge');
+      badge.textContent = data.status;
+      badge.className = 'status-badge status-' + data.status;
+
+      // 버튼 상태 업데이트
+      var hasContract = data.contractGenerated && data.contractDocId;
+      document.getElementById('btnGenerate').textContent =
+        hasContract ? '계약서 재생성' : '계약서 생성';
+      document.getElementById('btnPreview').disabled = !hasContract;
+      document.getElementById('btnEmail').disabled = !hasContract;
+      document.getElementById('btnSign').disabled = !hasContract || data.landlordSigned;
+
+      // 체크리스트 업데이트
+      setCheck('chkGenerate', data.contractGenerated);
+      setCheck('chkEmail', data.emailSent);
+      setCheck('chkLandlord', data.landlordSigned);
+      setCheck('chkTenant', data.tenantSigned);
+    }
+
+    function setCheck(id, done) {
+      var el = document.getElementById(id);
+      el.innerHTML = done ? '&#9745;' : '&#9744;';
+      el.className = 'check-icon ' + (done ? 'check-done' : 'check-pending');
+    }
+
+    function doGenerate() {
+      if (currentData && currentData.contractGenerated) {
+        if (!confirm('이미 계약서가 생성되어 있습니다.\n새로 생성하시겠습니까?\n(기존 문서는 휴지통으로 이동)')) {
+          return;
+        }
+      }
+      setButtonLoading('btnGenerate', true, '생성 중...');
+      showMessage('계약서를 생성하고 있습니다...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setButtonLoading('btnGenerate', false, '계약서 재생성');
+          showMessage('계약서가 생성되었습니다!', 'success');
+          loadData();
+        })
+        .withFailureHandler(function(err) {
+          setButtonLoading('btnGenerate', false, '계약서 생성');
+          onError(err);
+        })
+        .generateContractForSelectedRow();
+    }
+
+    function doPreview() {
+      if (currentData && currentData.contractDocId) {
+        var url = 'https://docs.google.com/document/d/' + currentData.contractDocId + '/edit';
+        window.open(url, '_blank');
+      }
+    }
+
+    function doSendEmail() {
+      if (!confirm('임차인에게 계약서 검토 및 서명 요청 이메일을 발송하시겠습니까?')) {
+        return;
+      }
+      setButtonLoading('btnEmail', true, '발송 중...');
+      showMessage('이메일을 발송하고 있습니다...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function() {
+          setButtonLoading('btnEmail', false, '이메일 발송');
+          showMessage('이메일이 발송되었습니다!', 'success');
+          loadData();
+        })
+        .withFailureHandler(function(err) {
+          setButtonLoading('btnEmail', false, '이메일 발송');
+          onError(err);
+        })
+        .sendContractEmail(currentData.rowNumber);
+    }
+
+    function doLandlordSign() {
+      // 임대인 서명은 별도 다이얼로그로 처리
+      google.script.run.openLandlordSignatureDialog();
+    }
+
+    function setButtonLoading(id, loading, text) {
+      var btn = document.getElementById(id);
+      btn.disabled = loading;
+      btn.textContent = text;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').style.display = show ? 'block' : 'none';
+      document.getElementById('content').style.display = show ? 'none' : 'block';
+    }
+
+    function showMessage(text, type) {
+      var el = document.getElementById('message');
+      el.textContent = text;
+      el.className = 'msg-' + type;
+      el.style.display = 'block';
+      if (type !== 'info') {
+        setTimeout(function() { el.style.display = 'none'; }, 5000);
+      }
+    }
+
+    function onError(err) {
+      showMessage('오류: ' + (err.message || err), 'error');
+    }
+  </script>
+</body>
+</html>

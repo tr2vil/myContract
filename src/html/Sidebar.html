@@ -84,6 +84,7 @@
     .btn-preview { background: #fff; color: #4285f4; border: 2px solid #4285f4; }
     .btn-email { background: #34a853; color: #fff; }
     .btn-sign { background: #ea4335; color: #fff; }
+    .btn-sms { background: #ff9800; color: #fff; }
     .btn-refresh { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
 
     .check-list {
@@ -167,6 +168,9 @@
       <button class="btn btn-email" id="btnEmail" onclick="doSendEmail()" disabled>
         이메일 발송
       </button>
+      <button class="btn btn-sms" id="btnSms" onclick="doCopySms()" disabled>
+        SMS 문자 복사
+      </button>
     </div>
 
     <!-- 진행 상태 체크리스트 -->
@@ -232,6 +236,7 @@
         hasContract ? '계약서 재생성' : '계약서 생성';
       document.getElementById('btnPreview').disabled = !hasContract;
       document.getElementById('btnEmail').disabled = !hasContract;
+      document.getElementById('btnSms').disabled = !data.emailSent;
 
       // 체크리스트 업데이트
       setCheck('chkGenerate', data.contractGenerated);
@@ -317,6 +322,27 @@
           onError(err);
         })
         .sendContractEmail(currentData.rowNumber);
+    }
+
+    function doCopySms() {
+      setButtonLoading('btnSms', true, '생성 중...');
+      google.script.run
+        .withSuccessHandler(function(text) {
+          // 클립보드에 복사
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          setButtonLoading('btnSms', false, 'SMS 문자 복사');
+          showMessage('SMS 문자가 클립보드에 복사되었습니다!\n연락처: ' + (currentData.tenantPhone || '(미입력)'), 'success');
+        })
+        .withFailureHandler(function(err) {
+          setButtonLoading('btnSms', false, 'SMS 문자 복사');
+          onError(err);
+        })
+        .getSmsText(currentData.rowNumber);
     }
 
     function setButtonLoading(id, loading, text) {

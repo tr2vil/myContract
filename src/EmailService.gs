@@ -72,6 +72,45 @@ function sendContractEmail(rowNumber) {
 }
 
 /**
+ * 선택된 행의 SMS 문자 텍스트 생성
+ * 설정 시트의 sms_template에서 플레이스홀더를 치환하여 반환
+ * @param {number} rowNumber - 행 번호
+ * @returns {string} SMS 텍스트
+ */
+function getSmsText(rowNumber) {
+  var config = getConfig();
+  var rowData = getRowData(rowNumber);
+
+  var token = rowData['서명_토큰'];
+  if (!token) {
+    throw new Error('서명 토큰이 없습니다. 이메일을 먼저 발송해주세요.');
+  }
+
+  var signUrl = config.webAppUrl ? config.webAppUrl + '?token=' + token : '(서명 URL 미설정)';
+
+  var template = config.smsTemplate;
+  // 플레이스홀더 치환
+  template = template.replace(/\{\{이름\}\}/g, rowData['이름'] || '');
+  template = template.replace(/\{\{지점명\}\}/g, rowData['지점명'] || '');
+  template = template.replace(/\{\{상호\}\}/g, rowData['상호'] || '');
+  template = template.replace(/\{\{층\}\}/g, rowData['층'] || '');
+  template = template.replace(/\{\{호수\}\}/g, rowData['호수'] || '');
+  template = template.replace(/\{\{보증금\}\}/g, rowData['보증금'] || '');
+  template = template.replace(/\{\{공급가액\}\}/g, rowData['공급가액'] || '');
+  template = template.replace(/\{\{서명링크\}\}/g, signUrl);
+
+  // 계약서 링크
+  var docId = rowData['계약서_문서ID'];
+  var contractLink = docId ? 'https://docs.google.com/document/d/' + docId + '/edit' : '(계약서 미생성)';
+  template = template.replace(/\{\{계약서_링크\}\}/g, contractLink);
+
+  // \n 문자열을 실제 줄바꿈으로 변환
+  template = template.replace(/\\n/g, '\n');
+
+  return template;
+}
+
+/**
  * 이메일 HTML 본문 생성
  * @param {Object} data - 이메일 데이터
  * @returns {string} HTML 문자열
@@ -129,9 +168,11 @@ function buildEmailHtml(data) {
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">\
     \
     <p style="color:#999; font-size:12px; line-height:1.6;">\
-      본 이메일은 자동 발송되었습니다.<br>\
-      문의사항이 있으시면 ' + data.senderName + '님께 직접 연락해주세요.\
-      ' + (data.landlordPhone ? '<br>연락처: ' + data.landlordPhone : '') + '\
+      본 메일은 시스템에 의해 자동 발송되었습니다.<br><br>\
+      문의사항이 있으시면 아래 연락처로 편하게 연락 주세요.<br><br>\
+      공유오피스 MOO 두정역점<br>\
+      대표 | ' + data.senderName + '<br>\
+      ' + (data.landlordPhone || '') + '\
     </p>\
   </div>\
 </div>\
@@ -218,9 +259,11 @@ function buildCompletionEmailHtml(data) {
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">\
     \
     <p style="color:#999; font-size:12px; line-height:1.6;">\
-      본 이메일은 자동 발송되었습니다.<br>\
-      문의사항이 있으시면 ' + data.senderName + '님께 직접 연락해주세요.\
-      ' + (data.landlordPhone ? '<br>연락처: ' + data.landlordPhone : '') + '\
+      본 메일은 시스템에 의해 자동 발송되었습니다.<br><br>\
+      문의사항이 있으시면 아래 연락처로 편하게 연락 주세요.<br><br>\
+      공유오피스 MOO 두정역점<br>\
+      대표 | ' + data.senderName + '<br>\
+      ' + (data.landlordPhone || '') + '\
     </p>\
   </div>\
 </div>\

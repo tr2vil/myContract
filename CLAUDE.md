@@ -23,12 +23,12 @@
 | Code.gs | 진입점. onOpen()으로 커스텀 메뉴 등록, 사이드바/다이얼로그 열기 | SheetHelpers, Config |
 | Config.gs | 설정 시트 CRUD. getConfig()로 설정값 객체 반환 | SheetHelpers (getSpreadsheet) |
 | SheetHelpers.gs | 데이터 접근 계층. 행 데이터 읽기, 컬럼 매핑, 상태 업데이트. getSpreadsheet() 정의 | 없음 (최하위 모듈) |
-| ContractGenerator.gs | Docs 템플릿 복사 → 플레이스홀더 치환 → 계약서 생성 | Config, SheetHelpers |
-| EmailService.gs | GmailApp으로 임차인에게 HTML 이메일 발송 | Config, SheetHelpers, SignatureService |
-| SignatureService.gs | 서명 토큰 생성, base64 이미지 → Drive 저장, Docs에 서명 이미지 삽입 | Config, SheetHelpers |
+| ContractGenerator.gs | Docs 템플릿 복사 → 플레이스홀더 치환 → 계약서 생성, 임대인 서명 자동 삽입 | Config, SheetHelpers |
+| EmailService.gs | GmailApp으로 이메일 발송 (계약요청 + 최종계약서), SMS 텍스트 생성 | Config, SheetHelpers, SignatureService |
+| SignatureService.gs | 서명 토큰 생성, 서명/신분증 이미지 → Drive 저장, Docs에 서명/신분증 삽입 | Config, SheetHelpers |
 | WebApp.gs | doGet(e) 웹앱 핸들러. 토큰 검증 후 서명 페이지 서빙 | SignatureService, SheetHelpers |
 | html/Sidebar.html | 사이드바 UI. google.script.run으로 서버 함수 호출 | - |
-| html/SignaturePage.html | 서명 캔버스 UI. 웹앱/다이얼로그 겸용 (isWebApp 플래그로 분기) | - |
+| html/SignaturePage.html | 서명 캔버스 + 신분증 업로드 UI. 웹앱 모드로 동작 (isWebApp 플래그) | - |
 
 ### 함수 호출 관계
 
@@ -37,11 +37,24 @@ onOpen() → 메뉴 등록
 openSidebar() → Sidebar.html 서빙
   Sidebar.html → getSelectedRowSummary() → 행 정보 표시
   Sidebar.html → generateContractForSelectedRow() → 계약서 생성 (임대인 서명 자동 삽입)
-  Sidebar.html → sendContractEmail(rowNumber) → 이메일 발송
+  Sidebar.html → sendContractEmail(rowNumber) → 계약요청 이메일 발송 (첨부파일 포함)
+  Sidebar.html → sendCompletionEmail(rowNumber) → 최종계약서 이메일 발송 (임대인 확인 후)
 
 doGet(e) → 토큰 검증 → SignaturePage.html 서빙 (웹앱)
-  SignaturePage.html → processSignature(token, dataUrl) → 임차인 서명 처리
+  SignaturePage.html → processSignature(token, dataUrl, idCardDataUrl) → 서명+신분증 처리
 ```
+
+### 계약 상태 흐름
+
+```
+작성중 → [계약서 생성] → 작성중
+       → [이메일 발송] → 서명대기
+       → [임차인 서명+신분증] → 서명완료
+       → [임대인 확인 → 최종계약서 발송] → 완료
+```
+
+- **서명완료**: 임차인 서명 완료 후 임대인 확인 대기 상태
+- **완료**: 임대인이 확인 후 최종계약서 이메일 발송 완료
 
 ### 웹앱 vs 스프레드시트 컨텍스트
 
@@ -66,13 +79,13 @@ Q:입금일 R:계약일 S:시작일 T:종료일 U:계약만료일 V:최초계약
 W:공급가액 X:보증금 Y:계산서 Z:계산서별도
 AA:상호2 AB:사업자등록번호2 AC:이름2
 AD:계약서_생성 AE:계약서_문서ID AF:계약서_링크
-AG:이메일_발송 AH:이메일_발송일 AI:서명_토큰
-AJ:임대인_서명 AK:임차인_서명 AL:계약_상태
+AG:이메일_발송 AH:이메일_발송일 AI:완료이메일_발송일 AJ:서명_토큰
+AK:임대인_서명 AL:임차인_서명 AM:계약_상태
 ```
 
 ### 시스템 컬럼 (SYSTEM_COLUMNS)
 
-AD~AL 컬럼은 시스템이 자동 관리. 플레이스홀더 치환 시 건너뜀.
+AD~AM 컬럼은 시스템이 자동 관리. 플레이스홀더 치환 시 건너뜀.
 
 ### 금액 컬럼 (CURRENCY_COLUMNS)
 
@@ -99,16 +112,19 @@ AD~AL 컬럼은 시스템이 자동 관리. 플레이스홀더 치환 시 건너
 Config.gs의 `getConfig()`가 반환하는 속성명과 설정 시트의 키 매핑:
 
 ```
-template_doc_id    → config.templateDocId
-output_folder_id   → config.outputFolderId
-signature_folder_id → config.signatureFolderId
-web_app_url        → config.webAppUrl
-sender_name        → config.senderName
-sender_email       → config.senderEmail
-company_name       → config.companyName
-landlord_name      → config.landlordName    (임대인 이름)
-landlord_phone     → config.landlordPhone   (임대인 연락처)
-landlord_email     → config.landlordEmail   (임대인 이메일)
+template_doc_id      → config.templateDocId
+output_folder_id     → config.outputFolderId
+signature_folder_id  → config.signatureFolderId
+id_card_folder_id    → config.idCardFolderId       (신분증 저장 폴더)
+web_app_url          → config.webAppUrl
+sender_name          → config.senderName
+sender_email         → config.senderEmail
+company_name         → config.companyName
+landlord_name        → config.landlordName          (임대인 이름)
+landlord_phone       → config.landlordPhone         (임대인 연락처)
+landlord_email       → config.landlordEmail         (임대인 이메일)
+sms_template         → config.smsTemplate           (SMS 문자 템플릿)
+attachment_file_ids  → config.attachmentFileIds      (이메일 첨부파일 Drive 파일 ID, 쉼표 구분)
 ```
 
 ## clasp 명령어 (최신 버전)
@@ -122,7 +138,39 @@ landlord_email     → config.landlordEmail   (임대인 이메일)
 ## 서명 페이지 (SignaturePage.html)
 
 웹앱 모드로 임차인 서명 수집에 사용. `doGet()`에서 `createTemplateFromFile()`로 서빙하며 템플릿 변수(`<?= token ?>` 등) 주입.
+
+서명 페이지 기능:
+- HTML5 Canvas 기반 서명/도장 그리기 (마우스/터치 지원)
+- **신분증 사본 업로드 (필수)**: 이미지 파일 선택 → FileReader로 base64 변환
+- `processSignature(token, dataUrl, idCardDataUrl)` 호출로 서명+신분증 동시 제출
+
 임대인 서명은 계약서 생성 시 자동 삽입되므로 별도 서명 UI 불필요.
+
+## 이메일 기능
+
+### 계약요청 이메일 (sendContractEmail)
+- 계약서 검토 링크 + 전자서명 링크 포함
+- `attachment_file_ids` 설정의 파일을 첨부 (예: 전대동의서.pdf)
+- 상태를 '서명대기'로 변경
+
+### 최종계약서 이메일 (sendCompletionEmail)
+- 임대인이 서명/신분증 확인 후 수동 발송
+- 완료된 계약서 확인 링크 포함
+- 상태를 '완료'로 변경
+
+### 이메일 footer
+```
+공유오피스 MOO 두정역점
+대표 | {sender_name}
+{landlord_phone}
+```
+
+### SMS 템플릿 플레이스홀더
+```
+{{이름}}, {{지점명}}, {{상호}}, {{층}}, {{호수}}, {{보증금}}, {{공급가액}}
+{{서명링크}} → 전자서명 웹앱 URL
+{{계약서_링크}} → Google Docs 계약서 URL
+```
 
 ## ★ Claude Code 배포 스킬 (필수 사용)
 
@@ -156,3 +204,4 @@ landlord_email     → config.landlordEmail   (임대인 이메일)
 - **Ui.showSidebar 권한 오류**: `script.container.ui` 스코프 추가로 해결
 - **웹앱에서 "계약목록 시트를 찾을 수 없습니다"**: `getSpreadsheet()` fallback 추가, initSettingsSheet()에서 SPREADSHEET_ID 저장으로 해결
 - **웹앱 코드 변경이 반영되지 않음**: `clasp push`는 HEAD만 업데이트. 웹앱은 배포된 버전을 실행하므로 `npx clasp deploy -i <deploymentId>`로 배포 업데이트 필요
+- **계약_상태 드롭다운**: '서명완료' 상태가 추가됨. 시트 초기화 시 드롭다운 옵션에 포함 필요

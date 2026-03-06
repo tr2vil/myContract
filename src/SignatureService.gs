@@ -63,10 +63,11 @@ function findRowByToken(token) {
 /**
  * 웹앱에서 서명이 제출되었을 때 호출
  * @param {string} token - 서명 토큰
- * @param {string} dataUrl - base64 인코딩된 PNG 이미지 (data:image/png;base64,...)
+ * @param {string} dataUrl - base64 인코딩된 서명/도장 이미지
+ * @param {string} idCardDataUrl - base64 인코딩된 신분증 이미지
  * @returns {Object} 처리 결과
  */
-function processSignature(token, dataUrl) {
+function processSignature(token, dataUrl, idCardDataUrl) {
   // 1. 토큰 검증
   var rowInfo = findRowByToken(token);
   if (!rowInfo) {
@@ -85,20 +86,82 @@ function processSignature(token, dataUrl) {
   // 3. 계약서 문서에 서명 삽입
   insertSignatureIntoDoc(rowInfo.docId, signatureFileId, '임차인');
 
-  // 4. 스프레드시트 상태 업데이트
-  updateCellValue(rowInfo.rowNumber, '임차인_서명', true);
-  updateCellValue(rowInfo.rowNumber, '계약_상태', '완료');
-
-  // 5. 서명 완료 안내 이메일 발송
-  try {
-    sendCompletionEmail(rowInfo.rowNumber);
-  } catch (e) {
-    Logger.log('완료 이메일 발송 실패: ' + e.message);
+  // 4. 신분증 사본 저장 및 계약서 첨부
+  if (idCardDataUrl) {
+    var idCardFileId = saveIdCardImage(idCardDataUrl, rowInfo.tenantName);
+    appendIdCardToDoc(rowInfo.docId, idCardFileId, rowInfo.tenantName);
   }
+
+  // 5. 스프레드시트 상태 업데이트 (임대인 확인 대기)
+  updateCellValue(rowInfo.rowNumber, '임차인_서명', true);
+  updateCellValue(rowInfo.rowNumber, '계약_상태', '서명완료');
 
   return { success: true };
 }
 
+
+/**
+ * 신분증 이미지를 Google Drive에 저장
+ * @param {string} dataUrl - base64 인코딩된 이미지
+ * @param {string} signerName - 서명자 이름
+ * @returns {string} 저장된 파일 ID
+ */
+function saveIdCardImage(dataUrl, signerName) {
+  var config = getConfig();
+  if (!config.idCardFolderId) {
+    throw new Error('설정 시트에 id_card_folder_id가 입력되지 않았습니다.');
+  }
+
+  var mimeMatch = dataUrl.match(/^data:(image\/\w+);base64,/);
+  var mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  var ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  var base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+  var decoded = Utilities.base64Decode(base64Data);
+  var timestamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmmss');
+  var fileName = '신분증_' + signerName + '_' + timestamp + '.' + ext;
+
+  var blob = Utilities.newBlob(decoded, mimeType, fileName);
+  var folder = DriveApp.getFolderById(config.idCardFolderId);
+  var file = folder.createFile(blob);
+
+  return file.getId();
+}
+
+/**
+ * 신분증 이미지를 계약서 문서 최하단에 첨부
+ * @param {string} docId - Google Docs 문서 ID
+ * @param {string} imageFileId - Drive 신분증 이미지 파일 ID
+ * @param {string} signerName - 서명자 이름
+ */
+function appendIdCardToDoc(docId, imageFileId, signerName) {
+  var doc = DocumentApp.openById(docId);
+  var body = doc.getBody();
+
+  // 구분선
+  body.appendHorizontalRule();
+
+  // 제목
+  var heading = body.appendParagraph('임차인 신분증 사본');
+  heading.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+  heading.setBold(true);
+
+  // 신분증 이미지 삽입
+  var imgBlob = DriveApp.getFileById(imageFileId).getBlob();
+  var para = body.appendParagraph('');
+  var img = para.appendInlineImage(imgBlob);
+
+  // 이미지 크기 조정 (가로 최대 400px, 비율 유지)
+  var origW = img.getWidth();
+  var origH = img.getHeight();
+  var maxW = 400;
+  if (origW > maxW && origW > 0 && origH > 0) {
+    var scale = maxW / origW;
+    img.setWidth(maxW);
+    img.setHeight(Math.round(origH * scale));
+  }
+
+  doc.saveAndClose();
+}
 
 /**
  * base64 이미지를 Google Drive에 저장

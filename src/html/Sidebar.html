@@ -56,6 +56,7 @@
     .status-작성중 { background: #9e9e9e; }
     .status-검토중 { background: #ff9800; }
     .status-서명대기 { background: #2196f3; }
+    .status-서명완료 { background: #ff9800; }
     .status-완료 { background: #4caf50; }
 
     .btn-group {
@@ -83,6 +84,7 @@
     .btn-generate { background: #4285f4; color: #fff; }
     .btn-preview { background: #fff; color: #4285f4; border: 2px solid #4285f4; }
     .btn-email { background: #34a853; color: #fff; }
+    .btn-complete-email { background: #ea4335; color: #fff; }
     .btn-sign { background: #ea4335; color: #fff; }
     .btn-sms { background: #ff9800; color: #fff; }
     .btn-refresh { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
@@ -166,10 +168,13 @@
         미리보기 (Google Docs)
       </button>
       <button class="btn btn-email" id="btnEmail" onclick="doSendEmail()" disabled>
-        이메일 발송
+        계약요청 이메일 발송
       </button>
       <button class="btn btn-sms" id="btnSms" onclick="doCopySms()" disabled>
         SMS 문자 복사
+      </button>
+      <button class="btn btn-complete-email" id="btnCompleteEmail" onclick="doSendCompleteEmail()" disabled>
+        최종계약서 이메일 전송
       </button>
     </div>
 
@@ -186,6 +191,10 @@
       <li>
         <span class="check-icon" id="chkTenant">&#9744;</span>
         임차인 서명
+      </li>
+      <li>
+        <span class="check-icon" id="chkComplete">&#9744;</span>
+        최종계약서 전송
       </li>
     </ul>
 
@@ -237,11 +246,14 @@
       document.getElementById('btnPreview').disabled = !hasContract;
       document.getElementById('btnEmail').disabled = !hasContract;
       document.getElementById('btnSms').disabled = !data.emailSent;
+      // 최종계약서 버튼: 서명완료 상태에서만 활성화
+      document.getElementById('btnCompleteEmail').disabled = (data.status !== '서명완료');
 
       // 체크리스트 업데이트
       setCheck('chkGenerate', data.contractGenerated);
       setCheck('chkEmail', data.emailSent);
       setCheck('chkTenant', data.tenantSigned);
+      setCheck('chkComplete', data.status === '완료');
 
       // 서명대기 상태이면 경량 폴링 시작
       if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
@@ -322,6 +334,30 @@
           onError(err);
         })
         .sendContractEmail(currentData.rowNumber);
+    }
+
+    function doSendCompleteEmail() {
+      var msg = '임차인의 서명 및 신분증을 확인하셨습니까?\n\n'
+        + '확인 후 최종계약서 이메일을 발송합니다.\n'
+        + '이름: ' + (currentData.tenantName || '-') + '\n'
+        + '이메일: ' + (currentData.tenantEmail || '(미입력)');
+      if (!confirm(msg)) {
+        return;
+      }
+      setButtonLoading('btnCompleteEmail', true, '발송 중...');
+      showMessage('최종계약서 이메일을 발송하고 있습니다...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function() {
+          setButtonLoading('btnCompleteEmail', false, '최종계약서 이메일 전송');
+          showMessage('최종계약서 이메일이 발송되었습니다!', 'success');
+          loadData();
+        })
+        .withFailureHandler(function(err) {
+          setButtonLoading('btnCompleteEmail', false, '최종계약서 이메일 전송');
+          onError(err);
+        })
+        .sendCompletionEmail(currentData.rowNumber);
     }
 
     function doCopySms() {

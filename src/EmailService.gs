@@ -235,6 +235,7 @@ function sendCompletionEmail(rowNumber) {
   });
 
   updateCellValue(rowNumber, '완료이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
+  updateCellValue(rowNumber, '계약_상태', '완료');
 }
 
 /**

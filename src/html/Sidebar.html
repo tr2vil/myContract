@@ -194,6 +194,7 @@
 
   <script>
     var currentData = null;
+    var pollTimer = null;
 
     // 페이지 로드 시 데이터 가져오기
     window.onload = function() {
@@ -236,6 +237,28 @@
       setCheck('chkGenerate', data.contractGenerated);
       setCheck('chkEmail', data.emailSent);
       setCheck('chkTenant', data.tenantSigned);
+
+      // 서명대기 상태이면 경량 폴링 시작
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      if (data.status === '서명대기') {
+        pollTimer = setTimeout(pollStatus, 15000);
+      }
+    }
+
+    function pollStatus() {
+      if (!currentData || !currentData.rowNumber) return;
+      google.script.run
+        .withSuccessHandler(function(status) {
+          if (status !== '서명대기') {
+            loadData();
+          } else {
+            pollTimer = setTimeout(pollStatus, 15000);
+          }
+        })
+        .withFailureHandler(function() {
+          pollTimer = setTimeout(pollStatus, 15000);
+        })
+        .checkSignatureStatus(currentData.rowNumber);
     }
 
     function setCheck(id, done) {

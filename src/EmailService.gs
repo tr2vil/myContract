@@ -66,7 +66,7 @@ function sendContractEmail(rowNumber) {
 
   // 상태 업데이트
   updateCellValue(rowNumber, '이메일_발송', true);
-  updateCellValue(rowNumber, '이메일_발송일', new Date());
+  updateCellValue(rowNumber, '이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
   updateCellValue(rowNumber, '서명_토큰', token);
   updateCellValue(rowNumber, '계약_상태', '서명대기');
 }
@@ -122,6 +122,95 @@ function buildEmailHtml(data) {
          style="display:inline-block; background:#34a853; color:#fff; \
                 padding:12px 24px; text-decoration:none; border-radius:6px; font-size:14px; font-weight:bold;">\
         전자서명하기\
+      </a>\
+    </div>\
+    ' : '') + '\
+    \
+    <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">\
+    \
+    <p style="color:#999; font-size:12px; line-height:1.6;">\
+      본 이메일은 자동 발송되었습니다.<br>\
+      문의사항이 있으시면 ' + data.senderName + '님께 직접 연락해주세요.\
+      ' + (data.landlordPhone ? '<br>연락처: ' + data.landlordPhone : '') + '\
+    </p>\
+  </div>\
+</div>\
+</body>\
+</html>';
+}
+
+/**
+ * 서명 완료 후 임차인에게 완료 안내 이메일 발송
+ * @param {number} rowNumber - 행 번호
+ */
+function sendCompletionEmail(rowNumber) {
+  var config = getConfig();
+  var rowData = getRowData(rowNumber);
+
+  var recipientEmail = rowData['이메일'];
+  if (!recipientEmail) return;
+
+  var recipientName = rowData['이름'];
+  var senderName = config.senderName || config.landlordName;
+  var docId = rowData['계약서_문서ID'];
+  var docUrl = docId ? 'https://docs.google.com/document/d/' + docId + '/edit' : '';
+
+  var unitInfo = '';
+  if (rowData['층'] || rowData['호수']) {
+    unitInfo = (rowData['층'] ? rowData['층'] + '층' : '') + (rowData['호수'] ? ' ' + rowData['호수'] + '호' : '');
+    unitInfo = unitInfo.trim();
+  }
+
+  var subject = '[계약서] ' + rowData['지점명'] + (unitInfo ? ' ' + unitInfo : '') + ' 계약서 서명 완료';
+
+  var htmlBody = buildCompletionEmailHtml({
+    recipientName: recipientName,
+    senderName: senderName,
+    propertyAddress: rowData['지점명'],
+    unitNumber: unitInfo,
+    docUrl: docUrl,
+    landlordPhone: config.landlordPhone
+  });
+
+  GmailApp.sendEmail(recipientEmail, subject, '', {
+    htmlBody: htmlBody,
+    name: senderName
+  });
+
+  updateCellValue(rowNumber, '완료이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
+}
+
+/**
+ * 서명 완료 안내 이메일 HTML 생성
+ */
+function buildCompletionEmailHtml(data) {
+  return '\
+<!DOCTYPE html>\
+<html>\
+<body style="margin:0; padding:0; background:#f5f5f5;">\
+<div style="font-family:\'Malgun Gothic\',\'Apple SD Gothic Neo\',sans-serif; max-width:600px; margin:0 auto; padding:20px;">\
+  <div style="background:#fff; border-radius:12px; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">\
+    \
+    <h2 style="color:#2e7d32; border-bottom:2px solid #4caf50; padding-bottom:12px; margin-top:0;">\
+      계약서 서명이 완료되었습니다\
+    </h2>\
+    \
+    <p style="font-size:15px; line-height:1.6;">\
+      ' + data.recipientName + '님 안녕하세요,<br>\
+      <strong>' + data.propertyAddress + (data.unitNumber ? ' ' + data.unitNumber : '') + '</strong> 계약서의\
+      임대인·임차인 서명이 모두 완료되었습니다.\
+    </p>\
+    \
+    <div style="background:#e8f5e9; padding:16px; border-radius:8px; margin:20px 0; text-align:center;">\
+      <p style="margin:0; font-size:24px;">&#10004;</p>\
+      <p style="margin:8px 0 0; font-weight:bold; color:#2e7d32; font-size:16px;">서명 완료</p>\
+    </div>\
+    ' + (data.docUrl ? '\
+    <div style="margin:24px 0; text-align:center;">\
+      <a href="' + data.docUrl + '" \
+         style="display:inline-block; background:#4285f4; color:#fff; \
+                padding:12px 24px; text-decoration:none; border-radius:6px; font-size:14px; font-weight:bold;">\
+        완료된 계약서 확인하기\
       </a>\
     </div>\
     ' : '') + '\

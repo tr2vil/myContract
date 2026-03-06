@@ -89,6 +89,13 @@ function processSignature(token, dataUrl) {
   updateCellValue(rowInfo.rowNumber, '임차인_서명', true);
   updateCellValue(rowInfo.rowNumber, '계약_상태', '완료');
 
+  // 5. 서명 완료 안내 이메일 발송
+  try {
+    sendCompletionEmail(rowInfo.rowNumber);
+  } catch (e) {
+    Logger.log('완료 이메일 발송 실패: ' + e.message);
+  }
+
   return { success: true };
 }
 
@@ -106,12 +113,15 @@ function saveSignatureImage(dataUrl, signerName, party) {
     throw new Error('설정 시트에 signature_folder_id가 입력되지 않았습니다.');
   }
 
-  var base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+  var mimeMatch = dataUrl.match(/^data:(image\/\w+);base64,/);
+  var mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  var ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  var base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
   var decoded = Utilities.base64Decode(base64Data);
   var timestamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmmss');
-  var fileName = '서명_' + party + '_' + signerName + '_' + timestamp + '.png';
+  var fileName = '서명_' + party + '_' + signerName + '_' + timestamp + '.' + ext;
 
-  var blob = Utilities.newBlob(decoded, 'image/png', fileName);
+  var blob = Utilities.newBlob(decoded, mimeType, fileName);
   var folder = DriveApp.getFolderById(config.signatureFolderId);
   var file = folder.createFile(blob);
 
@@ -172,8 +182,17 @@ function insertSignatureIntoDoc(docId, imageFileId, party) {
 
     var freshBlob = DriveApp.getFileById(imageFileId).getBlob();
     var img = para.insertInlineImage(0, freshBlob);
-    img.setWidth(150);
-    img.setHeight(60);
+    var origW = img.getWidth();
+    var origH = img.getHeight();
+    var maxH = 80;
+    if (origW > 0 && origH > 0) {
+      var scale = maxH / origH;
+      img.setWidth(Math.round(origW * scale));
+      img.setHeight(maxH);
+    } else {
+      img.setWidth(80);
+      img.setHeight(80);
+    }
   }
 
   doc.saveAndClose();

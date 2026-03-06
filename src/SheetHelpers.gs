@@ -14,7 +14,7 @@ var CONTRACT_HEADERS = [
   '상호2', '사업자등록번호2', '이름2',
   '계약서_생성', '계약서_문서ID', '계약서_링크',
   '이메일_발송', '이메일_발송일', '서명_토큰',
-  '임대인_서명', '임차인_서명', '계약_상태'
+  '임대인_서명', '임차인_서명', '계약_상태', '완료이메일_발송일'
 ];
 
 // 금액 컬럼 목록 (콤마 포맷 적용 대상)
@@ -24,7 +24,7 @@ var CURRENCY_COLUMNS = ['공급가액', '보증금'];
 var SYSTEM_COLUMNS = [
   '계약서_생성', '계약서_문서ID', '계약서_링크',
   '이메일_발송', '이메일_발송일', '서명_토큰',
-  '임대인_서명', '임차인_서명', '계약_상태'
+  '임대인_서명', '임차인_서명', '계약_상태', '완료이메일_발송일'
 ];
 
 /**
@@ -151,6 +151,18 @@ function getSelectedRowSummary() {
     tenantSigned: data['임차인_서명'] === 'true',
     status: data['계약_상태'] || '작성중'
   };
+}
+
+/**
+ * 특정 행의 계약_상태를 경량 조회 (폴링용)
+ * @param {number} rowNumber - 행 번호
+ * @returns {string} 계약_상태 값
+ */
+function checkSignatureStatus(rowNumber) {
+  var sheet = getContractSheet();
+  var cols = getColumnIndices();
+  var colIndex = cols['계약_상태'];
+  return sheet.getRange(rowNumber, colIndex).getValue() || '작성중';
 }
 
 /**

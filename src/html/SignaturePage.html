@@ -43,6 +43,57 @@
       line-height: 1.6;
     }
     .info-box strong { color: #1a73e8; }
+    .tab-row {
+      display: flex;
+      gap: 0;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: bold;
+      color: #888;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab.active {
+      color: #4285f4;
+      border-bottom-color: #4285f4;
+    }
+    .upload-area {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 12px;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-area:hover { border-color: #4285f4; background: #f8faff; }
+    .upload-area .icon { font-size: 36px; margin-bottom: 8px; }
+    .upload-area img {
+      max-width: 100%;
+      max-height: 140px;
+      border-radius: 4px;
+    }
+    .upload-area .reselect {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #4285f4;
+      cursor: pointer;
+    }
     .canvas-label {
       font-size: 13px;
       color: #666;
@@ -96,9 +147,34 @@
       font-size: 14px;
       display: none;
     }
-    .status-success { background: #e8f5e9; color: #2e7d32; }
+    .status-success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 20px;
+      animation: fadeInUp 0.4s ease;
+    }
+    .status-success .check-icon {
+      font-size: 40px;
+      display: block;
+      margin-bottom: 8px;
+    }
     .status-error { background: #fce4ec; color: #c62828; }
     .status-loading { background: #e3f2fd; color: #1565c0; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.2s steps(1) infinite;
+    }
 
     .agreement {
       font-size: 12px;
@@ -120,9 +196,25 @@
     <strong>소재지:</strong> <span id="propertyAddr"></span>
   </div>
 
-  <p class="canvas-label">서명란 (마우스 또는 터치로 서명)</p>
-  <div class="canvas-wrapper" id="canvasWrapper">
-    <canvas id="signatureCanvas"></canvas>
+  <div class="tab-row">
+    <div class="tab active" id="tabDraw" onclick="switchTab('draw')">서명 그리기</div>
+    <div class="tab" id="tabUpload" onclick="switchTab('upload')">도장 업로드</div>
+  </div>
+
+  <div id="drawSection">
+    <p class="canvas-label">서명란 (마우스 또는 터치로 서명)</p>
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="signatureCanvas"></canvas>
+    </div>
+  </div>
+
+  <div id="uploadSection" style="display:none;">
+    <input type="file" id="stampInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)">
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('stampInput').click()">
+      <div class="icon">&#128206;</div>
+      <div>도장 이미지를 선택하세요</div>
+      <div style="font-size:12px; color:#aaa; margin-top:4px;">PNG, JPG 파일 지원</div>
+    </div>
   </div>
 
   <div class="btn-row">
@@ -157,6 +249,40 @@
   } catch(e) {
     // 다이얼로그 모드 (임대인 서명) - 템플릿 변수 없음
     isWebApp = false;
+  }
+
+  // ---- 탭 전환 ----
+  var activeTab = 'draw';
+  var uploadedDataUrl = null;
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('tabDraw').className = tab === 'draw' ? 'tab active' : 'tab';
+    document.getElementById('tabUpload').className = tab === 'upload' ? 'tab active' : 'tab';
+    document.getElementById('drawSection').style.display = tab === 'draw' ? 'block' : 'none';
+    document.getElementById('uploadSection').style.display = tab === 'upload' ? 'block' : 'none';
+  }
+
+  // ---- 파일 업로드 ----
+  function handleFileSelect(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.match('image.*')) {
+      showStatus('이미지 파일만 업로드 가능합니다.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showStatus('파일 크기는 5MB 이하여야 합니다.', 'error');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      uploadedDataUrl = ev.target.result;
+      var area = document.getElementById('uploadArea');
+      area.innerHTML = '<img src="' + uploadedDataUrl + '">' +
+        '<div class="reselect">다른 이미지 선택</div>';
+    };
+    reader.readAsDataURL(file);
   }
 
   // ---- 캔버스 초기화 ----
@@ -264,17 +390,25 @@
   }
 
   function submitSignature() {
-    if (!hasDrawn) {
-      showStatus('서명을 해주세요.', 'error');
-      return;
+    var dataUrl;
+    if (activeTab === 'draw') {
+      if (!hasDrawn) {
+        showStatus('서명을 해주세요.', 'error');
+        return;
+      }
+      dataUrl = canvas.toDataURL('image/png');
+    } else {
+      if (!uploadedDataUrl) {
+        showStatus('도장 이미지를 선택해주세요.', 'error');
+        return;
+      }
+      dataUrl = uploadedDataUrl;
     }
 
     var btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.textContent = '처리 중...';
-    showStatus('서명을 처리하고 있습니다...', 'loading');
-
-    var dataUrl = canvas.toDataURL('image/png');
+    showLoadingProgress();
 
     if (isWebApp) {
       // 웹앱 모드: 임차인 서명 (토큰 사용)
@@ -291,8 +425,28 @@
     }
   }
 
+  var loadingTimer = null;
+
+  function showLoadingProgress() {
+    var steps = [
+      '서명을 처리하고 있습니다',
+      '이미지를 저장하고 있습니다',
+      '계약서에 반영하고 있습니다',
+      '거의 완료되었습니다'
+    ];
+    var i = 0;
+    showStatusHtml('<span class="loading-dots">' + steps[0] + '</span>', 'loading');
+    loadingTimer = setInterval(function() {
+      i++;
+      if (i < steps.length) {
+        showStatusHtml('<span class="loading-dots">' + steps[i] + '</span>', 'loading');
+      }
+    }, 2500);
+  }
+
   function onSuccess() {
-    showStatus('서명이 완료되었습니다! 감사합니다.', 'success');
+    if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+    showStatusHtml('<span class="check-icon">&#10004;</span>서명이 완료되었습니다!<br><span style="font-size:14px;font-weight:normal;">감사합니다.</span>', 'success');
     document.getElementById('submitBtn').textContent = '완료';
 
     // 다이얼로그 모드이면 잠시 후 닫기
@@ -304,6 +458,7 @@
   }
 
   function onFailure(err) {
+    if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
     showStatus('오류: ' + (err.message || err), 'error');
     var btn = document.getElementById('submitBtn');
     btn.disabled = false;
@@ -313,6 +468,13 @@
   function showStatus(text, type) {
     var el = document.getElementById('status');
     el.textContent = text;
+    el.className = 'status-' + type;
+    el.style.display = 'block';
+  }
+
+  function showStatusHtml(html, type) {
+    var el = document.getElementById('status');
+    el.innerHTML = html;
     el.className = 'status-' + type;
     el.style.display = 'block';
   }

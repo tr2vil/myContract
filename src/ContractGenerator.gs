@@ -32,21 +32,44 @@ function generateContract(rowNumber) {
   // 2. 행 데이터 읽기
   var rowData = getRowData(rowNumber);
 
-  if (!rowData['임대인_이름'] || !rowData['임차인_이름']) {
-    throw new Error('임대인 이름과 임차인 이름은 필수 입력 항목입니다.');
+  if (!rowData['이름']) {
+    throw new Error('이름은 필수 입력 항목입니다.');
   }
 
   // 3. 템플릿 복사
   var templateFile = DriveApp.getFileById(config.templateDocId);
   var folder = DriveApp.getFolderById(config.outputFolderId);
 
-  var dateStr = rowData['계약일자'] || Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
-  var contractName = '임대차계약서_' + rowData['임대인_이름'] + '_' + rowData['임차인_이름'] + '_' + dateStr;
+  var dateStr = rowData['계약일'] || Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  var contractName = '계약서_' + (rowData['상호'] || '') + '_' + rowData['이름'] + '_' + dateStr;
 
   var copiedFile = templateFile.makeCopy(contractName, folder);
   var docId = copiedFile.getId();
 
-  // 4. 플레이스홀더 치환
+  // 4. 금액 한글 변환 플레이스홀더 추가
+  CURRENCY_COLUMNS.forEach(function(col) {
+    var rawVal = rowData[col];
+    if (rawVal) {
+      var numVal = parseInt(String(rawVal).replace(/,/g, ''), 10);
+      if (!isNaN(numVal)) {
+        rowData[col + '_한글'] = numberToKorean(numVal);
+      }
+    }
+  });
+
+  // 날짜에서 일(dd) 추출 플레이스홀더
+  var dateColumns = ['시작일', '종료일', '계약일', '입금일'];
+  dateColumns.forEach(function(col) {
+    if (rowData[col]) {
+      var dayMatch = rowData[col].match(/(\d+)일/);
+      if (dayMatch) {
+        var day = parseInt(dayMatch[1], 10);
+        rowData[col + '_일'] = (day < 10 ? '0' : '') + day;
+      }
+    }
+  });
+
+  // 5. 플레이스홀더 치환
   var doc = DocumentApp.openById(docId);
   var body = doc.getBody();
 
@@ -55,7 +78,7 @@ function generateContract(rowNumber) {
     var key = keys[i];
 
     // 시스템 관리 컬럼은 건너뛰기
-    if (SYSTEM_COLUMNS.indexOf(key) !== -1 || key === '번호') {
+    if (SYSTEM_COLUMNS.indexOf(key) !== -1 || key === '순번') {
       continue;
     }
 
@@ -67,7 +90,7 @@ function generateContract(rowNumber) {
   doc.saveAndClose();
 
   // 5. 임차인에게 뷰어 권한 부여
-  var tenantEmail = rowData['임차인_이메일'];
+  var tenantEmail = rowData['이메일'];
   if (tenantEmail) {
     copiedFile.addViewer(tenantEmail);
   }

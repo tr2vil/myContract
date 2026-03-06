@@ -131,15 +131,15 @@
     <!-- 계약 정보 요약 -->
     <div class="info-card">
       <div class="info-row">
-        <span class="label">임대인</span>
-        <span class="val" id="landlordName">-</span>
+        <span class="label">상호</span>
+        <span class="val" id="businessName">-</span>
       </div>
       <div class="info-row">
-        <span class="label">임차인</span>
+        <span class="label">이름</span>
         <span class="val" id="tenantName">-</span>
       </div>
       <div class="info-row">
-        <span class="label">소재지</span>
+        <span class="label">위치</span>
         <span class="val" id="propertyAddr">-</span>
       </div>
       <div class="info-row">
@@ -147,8 +147,8 @@
         <span class="val" id="deposit">-</span>
       </div>
       <div class="info-row">
-        <span class="label">월세</span>
-        <span class="val" id="monthlyRent">-</span>
+        <span class="label">공급가액</span>
+        <span class="val" id="supplyAmount">-</span>
       </div>
       <div class="info-row">
         <span class="label">상태</span>
@@ -220,12 +220,12 @@
       showLoading(false);
 
       // 정보 표시
-      document.getElementById('landlordName').textContent = data.landlordName;
+      document.getElementById('businessName').textContent = data.businessName;
       document.getElementById('tenantName').textContent = data.tenantName;
       document.getElementById('propertyAddr').textContent =
         data.propertyAddress + (data.unitNumber ? ' ' + data.unitNumber : '');
       document.getElementById('deposit').textContent = data.deposit + '원';
-      document.getElementById('monthlyRent').textContent = data.monthlyRent + '원';
+      document.getElementById('supplyAmount').textContent = data.supplyAmount + '원';
 
       // 상태 뱃지
       var badge = document.getElementById('statusBadge');

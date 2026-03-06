@@ -41,7 +41,7 @@ function doGet(e) {
   template.isWebApp = true;
 
   return template.evaluate()
-    .setTitle('임대차계약서 전자서명')
+    .setTitle('계약서 전자서명')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

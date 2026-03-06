@@ -18,16 +18,16 @@ function sendContractEmail(rowNumber) {
     throw new Error('계약서가 아직 생성되지 않았습니다. 먼저 계약서를 생성해주세요.');
   }
 
-  var recipientEmail = rowData['임차인_이메일'];
+  var recipientEmail = rowData['이메일'];
   if (!recipientEmail) {
-    throw new Error('임차인 이메일이 입력되지 않았습니다.');
+    throw new Error('이메일이 입력되지 않았습니다.');
   }
 
   // 서명 토큰 생성
   var token = generateSignatureToken(rowNumber);
 
-  var recipientName = rowData['임차인_이름'];
-  var senderName = config.senderName || rowData['임대인_이름'];
+  var recipientName = rowData['이름'];
+  var senderName = config.senderName || config.landlordName;
   var docUrl = 'https://docs.google.com/document/d/' + docId + '/edit';
 
   // 서명 링크 구성
@@ -36,20 +36,26 @@ function sendContractEmail(rowNumber) {
     signUrl = config.webAppUrl + '?token=' + token;
   }
 
-  var subject = '[임대차계약서] ' + rowData['소재지'] + ' 계약서 검토 및 서명 요청';
+  var unitInfo = '';
+  if (rowData['층'] || rowData['호수']) {
+    unitInfo = (rowData['층'] ? rowData['층'] + '층' : '') + (rowData['호수'] ? ' ' + rowData['호수'] + '호' : '');
+    unitInfo = unitInfo.trim();
+  }
+
+  var subject = '[계약서] ' + rowData['지점명'] + (unitInfo ? ' ' + unitInfo : '') + ' 계약서 검토 및 서명 요청';
 
   var htmlBody = buildEmailHtml({
     recipientName: recipientName,
     senderName: senderName,
-    propertyAddress: rowData['소재지'],
-    unitNumber: rowData['동_호수'],
+    propertyAddress: rowData['지점명'],
+    unitNumber: unitInfo,
     deposit: rowData['보증금'],
-    monthlyRent: rowData['월세'],
-    leaseStart: rowData['임대기간_시작'],
-    leaseEnd: rowData['임대기간_종료'],
+    supplyAmount: rowData['공급가액'],
+    leaseStart: rowData['시작일'],
+    leaseEnd: rowData['종료일'],
     docUrl: docUrl,
     signUrl: signUrl,
-    landlordPhone: rowData['임대인_전화']
+    landlordPhone: config.landlordPhone
   });
 
   // 이메일 발송
@@ -79,21 +85,21 @@ function buildEmailHtml(data) {
   <div style="background:#fff; border-radius:12px; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">\
     \
     <h2 style="color:#333; border-bottom:2px solid #4285f4; padding-bottom:12px; margin-top:0;">\
-      임대차계약서 검토 및 서명 요청\
+      계약서 검토 및 서명 요청\
     </h2>\
     \
     <p style="font-size:15px; line-height:1.6;">\
       ' + data.recipientName + '님 안녕하세요,<br>\
-      ' + data.senderName + '님이 아래 부동산에 대한 임대차계약서를 보내드립니다.\
+      ' + data.senderName + '님이 아래 계약서를 보내드립니다.\
     </p>\
     \
     <div style="background:#f8f9fa; padding:16px; border-radius:8px; margin:20px 0; border-left:4px solid #4285f4;">\
-      <p style="margin:0 0 6px; font-weight:bold; color:#4285f4;">부동산 정보</p>\
+      <p style="margin:0 0 6px; font-weight:bold; color:#4285f4;">계약 정보</p>\
       <table style="width:100%; font-size:14px; line-height:1.8;">\
-        <tr><td style="color:#666; width:80px;">소재지</td><td>' + data.propertyAddress + ' ' + (data.unitNumber || '') + '</td></tr>\
+        <tr><td style="color:#666; width:80px;">위치</td><td>' + data.propertyAddress + (data.unitNumber ? ' ' + data.unitNumber : '') + '</td></tr>\
         <tr><td style="color:#666;">보증금</td><td>' + data.deposit + '원</td></tr>\
-        <tr><td style="color:#666;">월세</td><td>' + data.monthlyRent + '원</td></tr>\
-        <tr><td style="color:#666;">임대기간</td><td>' + data.leaseStart + ' ~ ' + data.leaseEnd + '</td></tr>\
+        <tr><td style="color:#666;">공급가액</td><td>' + data.supplyAmount + '원</td></tr>\
+        <tr><td style="color:#666;">계약기간</td><td>' + data.leaseStart + ' ~ ' + data.leaseEnd + '</td></tr>\
       </table>\
     </div>\
     \

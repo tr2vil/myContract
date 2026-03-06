@@ -38,7 +38,9 @@ function getConfig() {
     senderName: raw['sender_name'] || '',
     senderEmail: raw['sender_email'] || '',
     companyName: raw['company_name'] || '',
-    defaultLeaseYears: Number(raw['default_lease_years']) || 2
+    landlordName: raw['landlord_name'] || '',
+    landlordPhone: raw['landlord_phone'] || '',
+    landlordEmail: raw['landlord_email'] || ''
   };
 }
 
@@ -84,14 +86,16 @@ function initSettingsSheet() {
 
   // 기본 설정 항목
   var settings = [
-    ['template_doc_id', '', '임대차계약서 템플릿 Google Docs 문서 ID'],
+    ['template_doc_id', '', '계약서 템플릿 Google Docs 문서 ID'],
     ['output_folder_id', '', '생성된 계약서를 저장할 Google Drive 폴더 ID'],
     ['signature_folder_id', '', '서명 이미지를 저장할 Google Drive 폴더 ID'],
     ['web_app_url', '', '서명 웹앱 배포 URL (배포 후 입력)'],
     ['sender_name', '', '이메일 발신자 이름 (예: 홍길동)'],
     ['sender_email', '', '발신 이메일 주소 (참고용, 실제로는 로그인 계정 사용)'],
-    ['company_name', '', '부동산 회사명 (선택사항)'],
-    ['default_lease_years', '2', '기본 임대기간 (년)']
+    ['company_name', '', '회사명 (선택사항)'],
+    ['landlord_name', '', '임대인(갑) 이름'],
+    ['landlord_phone', '', '임대인 연락처'],
+    ['landlord_email', '', '임대인 이메일']
   ];
   sheet.getRange(2, 1, settings.length, 3).setValues(settings);
 

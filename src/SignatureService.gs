@@ -40,12 +40,17 @@ function findRowByToken(token) {
       var rowNumber = i + 2;
       var rowData = getRowData(rowNumber);
 
+      var unitInfo = '';
+      if (rowData['층'] || rowData['호수']) {
+        unitInfo = (rowData['층'] ? rowData['층'] + '층' : '') + (rowData['호수'] ? ' ' + rowData['호수'] + '호' : '');
+        unitInfo = unitInfo.trim();
+      }
+
       return {
         rowNumber: rowNumber,
-        tenantName: rowData['임차인_이름'],
-        landlordName: rowData['임대인_이름'],
-        propertyAddress: rowData['소재지'],
-        unitNumber: rowData['동_호수'],
+        tenantName: rowData['이름'],
+        propertyAddress: rowData['지점명'],
+        unitNumber: unitInfo,
         docId: rowData['계약서_문서ID'],
         landlordSigned: rowData['임대인_서명'] === 'true',
         tenantSigned: rowData['임차인_서명'] === 'true'
@@ -108,7 +113,9 @@ function processLandlordSignature(dataUrl) {
   }
 
   // 서명 이미지 저장
-  var signatureFileId = saveSignatureImage(dataUrl, rowData['임대인_이름'], '임대인');
+  var config = getConfig();
+  var landlordName = config.landlordName || '임대인';
+  var signatureFileId = saveSignatureImage(dataUrl, landlordName, '임대인');
 
   // 계약서에 서명 삽입
   insertSignatureIntoDoc(rowData['계약서_문서ID'], signatureFileId, '임대인');

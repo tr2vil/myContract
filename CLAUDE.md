@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 
-임대차계약서 자동 생성 시스템. Google Apps Script(GAS) 기반으로 Google Sheets에서 계약 데이터를 관리하고, Google Docs 계약서를 자동 생성하며, 이메일 발송 및 전자서명을 수집한다.
+상업용 건물 임대 관리 및 계약서 자동 생성 시스템. Google Apps Script(GAS) 기반으로 Google Sheets에서 임차인/업체 데이터를 관리하고, Google Docs 계약서를 자동 생성하며, 이메일 발송 및 전자서명을 수집한다.
 
 ## 기술 환경
 
@@ -60,31 +60,37 @@ doGet(e) → 토큰 검증 → SignaturePage.html 서빙 (웹앱)
 ### 계약목록 시트 헤더 (CONTRACT_HEADERS 배열, SheetHelpers.gs)
 
 ```
-A:번호 B:계약일자
-C:임대인_이름 D:임대인_주민번호 E:임대인_주소 F:임대인_전화 G:임대인_이메일
-H:임차인_이름 I:임차인_주민번호 J:임차인_주소 K:임차인_전화 L:임차인_이메일
-M:소재지 N:건물유형 O:면적_m2 P:동_호수
-Q:보증금 R:월세 S:관리비
-T:계약금 U:중도금 V:잔금
-W:계약금_지급일 X:중도금_지급일 Y:잔금_지급일
-Z:임대기간_시작 AA:임대기간_종료
-AB:특약사항
-AC:계약서_생성 AD:계약서_문서ID AE:계약서_링크
-AF:이메일_발송 AG:이메일_발송일 AH:서명_토큰
-AI:임대인_서명 AJ:임차인_서명 AK:계약_상태
+A:순번 B:상주 C:사업자 D:지점명 E:층 F:호수 G:평수
+H:상호 I:사업자등록번호 J:업체거주지
+K:이름 L:연락처 M:비고 N:비고(게시판) O:긴급연락처 P:이메일
+Q:입금일 R:계약일 S:시작일 T:종료일 U:계약만료일 V:최초계약일
+W:공급가액 X:보증금 Y:계산서 Z:계산서별도
+AA:상호2 AB:사업자등록번호2 AC:이름2
+AD:계약서_생성 AE:계약서_문서ID AF:계약서_링크
+AG:이메일_발송 AH:이메일_발송일 AI:서명_토큰
+AJ:임대인_서명 AK:임차인_서명 AL:계약_상태
 ```
 
 ### 시스템 컬럼 (SYSTEM_COLUMNS)
 
-AC~AK 컬럼은 시스템이 자동 관리. 플레이스홀더 치환 시 건너뜀.
+AD~AL 컬럼은 시스템이 자동 관리. 플레이스홀더 치환 시 건너뜀.
 
 ### 금액 컬럼 (CURRENCY_COLUMNS)
 
-보증금, 월세, 관리비, 계약금, 중도금, 잔금 → getRowData()에서 자동 콤마 포맷.
+공급가액, 보증금 → getRowData()에서 자동 콤마 포맷.
+
+### 특수 컬럼
+
+- 계산서: 드롭다운 (세금|현금|어플|카드)
+- 계산서별도: 체크박스
+
+### 임대인 정보
+
+임대인(갑) 정보는 스프레드시트 컬럼이 아닌 **설정 시트**에서 관리 (landlord_name, landlord_phone, landlord_email).
 
 ## Google Docs 템플릿 규칙
 
-- 플레이스홀더: `{{컬럼헤더명}}` (예: `{{임대인_이름}}`, `{{보증금}}`)
+- 플레이스홀더: `{{컬럼헤더명}}` (예: `{{상호}}`, `{{이름}}`, `{{보증금}}`)
 - 서명란: `[임대인 서명란]`, `[임차인 서명란]` → 서명 이미지로 대체
 - 컬럼 헤더명과 플레이스홀더명이 동일해야 자동 매핑됨
 - `body.replaceText()`는 정규식 기반이므로 `escapeRegex()`로 특수문자 이스케이프
@@ -101,7 +107,9 @@ web_app_url        → config.webAppUrl
 sender_name        → config.senderName
 sender_email       → config.senderEmail
 company_name       → config.companyName
-default_lease_years → config.defaultLeaseYears
+landlord_name      → config.landlordName    (임대인 이름)
+landlord_phone     → config.landlordPhone   (임대인 연락처)
+landlord_email     → config.landlordEmail   (임대인 이메일)
 ```
 
 ## clasp 명령어 (최신 버전)

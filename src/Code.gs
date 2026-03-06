@@ -57,6 +57,22 @@ function initializeSheets() {
   initContractSheet();
   initSettingsSheet();
 
+  // 기본 시트(시트1 등) 삭제
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var name = sheets[i].getName();
+    if (name !== '계약목록' && name !== '설정') {
+      ss.deleteSheet(sheets[i]);
+    }
+  }
+
+  // 탭 순서: 설정(1번) → 계약목록(2번)
+  ss.setActiveSheet(ss.getSheetByName('설정'));
+  ss.moveActiveSheet(1);
+  ss.setActiveSheet(ss.getSheetByName('계약목록'));
+  ss.moveActiveSheet(2);
+
   ui.alert('초기 설정이 완료되었습니다!\n\n다음 단계:\n1. 설정 시트에서 템플릿 문서 ID 등을 입력하세요.\n2. 계약목록 시트에서 계약 데이터를 입력하세요.');
 }
 

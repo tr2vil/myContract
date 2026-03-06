@@ -167,9 +167,6 @@
       <button class="btn btn-email" id="btnEmail" onclick="doSendEmail()" disabled>
         이메일 발송
       </button>
-      <button class="btn btn-sign" id="btnSign" onclick="doLandlordSign()" disabled>
-        임대인 서명
-      </button>
     </div>
 
     <!-- 진행 상태 체크리스트 -->
@@ -181,10 +178,6 @@
       <li>
         <span class="check-icon" id="chkEmail">&#9744;</span>
         이메일 발송
-      </li>
-      <li>
-        <span class="check-icon" id="chkLandlord">&#9744;</span>
-        임대인 서명
       </li>
       <li>
         <span class="check-icon" id="chkTenant">&#9744;</span>
@@ -238,12 +231,10 @@
         hasContract ? '계약서 재생성' : '계약서 생성';
       document.getElementById('btnPreview').disabled = !hasContract;
       document.getElementById('btnEmail').disabled = !hasContract;
-      document.getElementById('btnSign').disabled = !hasContract || data.landlordSigned;
 
       // 체크리스트 업데이트
       setCheck('chkGenerate', data.contractGenerated);
       setCheck('chkEmail', data.emailSent);
-      setCheck('chkLandlord', data.landlordSigned);
       setCheck('chkTenant', data.tenantSigned);
     }
 
@@ -283,7 +274,10 @@
     }
 
     function doSendEmail() {
-      if (!confirm('임차인에게 계약서 검토 및 서명 요청 이메일을 발송하시겠습니까?')) {
+      var emailMsg = '다음 임차인에게 계약서 검토 및 서명 요청 이메일을 발송하시겠습니까?\n\n'
+        + '이름: ' + (currentData.tenantName || '-') + '\n'
+        + '이메일: ' + (currentData.tenantEmail || '(미입력)');
+      if (!confirm(emailMsg)) {
         return;
       }
       setButtonLoading('btnEmail', true, '발송 중...');
@@ -300,11 +294,6 @@
           onError(err);
         })
         .sendContractEmail(currentData.rowNumber);
-    }
-
-    function doLandlordSign() {
-      // 임대인 서명은 별도 다이얼로그로 처리
-      google.script.run.openLandlordSignatureDialog();
     }
 
     function setButtonLoading(id, loading, text) {

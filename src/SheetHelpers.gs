@@ -142,6 +142,7 @@ function getSelectedRowSummary() {
     unitNumber: unitInfo,
     deposit: data['보증금'] || '0',
     supplyAmount: data['공급가액'] || '0',
+    tenantEmail: data['이메일'] || '',
     contractDate: data['계약일'] || '(미입력)',
     contractGenerated: data['계약서_생성'] === 'true',
     contractDocId: data['계약서_문서ID'] || '',

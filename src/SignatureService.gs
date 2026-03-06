@@ -87,49 +87,11 @@ function processSignature(token, dataUrl) {
 
   // 4. 스프레드시트 상태 업데이트
   updateCellValue(rowInfo.rowNumber, '임차인_서명', true);
-
-  // 양측 모두 서명 완료 시 상태 변경
-  if (rowInfo.landlordSigned) {
-    updateCellValue(rowInfo.rowNumber, '계약_상태', '완료');
-  }
+  updateCellValue(rowInfo.rowNumber, '계약_상태', '완료');
 
   return { success: true };
 }
 
-/**
- * 임대인 서명 처리 (사이드바에서 호출)
- * @param {string} dataUrl - base64 인코딩된 PNG 이미지
- * @returns {Object} 처리 결과
- */
-function processLandlordSignature(dataUrl) {
-  var rowNumber = getSelectedRow();
-  var rowData = getRowData(rowNumber);
-
-  if (!rowData['계약서_문서ID']) {
-    throw new Error('계약서가 아직 생성되지 않았습니다.');
-  }
-  if (rowData['임대인_서명'] === 'true') {
-    throw new Error('이미 서명이 완료되었습니다.');
-  }
-
-  // 서명 이미지 저장
-  var config = getConfig();
-  var landlordName = config.landlordName || '임대인';
-  var signatureFileId = saveSignatureImage(dataUrl, landlordName, '임대인');
-
-  // 계약서에 서명 삽입
-  insertSignatureIntoDoc(rowData['계약서_문서ID'], signatureFileId, '임대인');
-
-  // 상태 업데이트
-  updateCellValue(rowNumber, '임대인_서명', true);
-
-  // 양측 모두 서명 완료 확인
-  if (rowData['임차인_서명'] === 'true') {
-    updateCellValue(rowNumber, '계약_상태', '완료');
-  }
-
-  return { success: true };
-}
 
 /**
  * base64 이미지를 Google Drive에 저장
@@ -167,19 +129,20 @@ function insertSignatureIntoDoc(docId, imageFileId, party) {
   var body = doc.getBody();
 
   var placeholder = party === '임대인' ? '\\[임대인 서명란\\]' : '\\[임차인 서명란\\]';
-  var searchResult = body.findText(placeholder);
+  var imageBlob = DriveApp.getFileById(imageFileId).getBlob();
 
-  if (searchResult) {
+  // 모든 서명란을 찾아서 각각 이미지 삽입
+  var searchResult;
+  while ((searchResult = body.findText(placeholder)) !== null) {
     var element = searchResult.getElement();
     var parent = element.getParent();
 
     // 플레이스홀더 텍스트 제거
-    var plainPlaceholder = party === '임대인' ? '[임대인 서명란]' : '[임차인 서명란]';
-    body.replaceText(placeholder, '');
+    var start = searchResult.getStartOffset();
+    var end = searchResult.getEndOffsetInclusive();
+    element.asText().deleteText(start, end);
 
     // 서명 이미지 삽입
-    var imageBlob = DriveApp.getFileById(imageFileId).getBlob();
-
     if (parent.getType() === DocumentApp.ElementType.PARAGRAPH) {
       var paragraph = parent.asParagraph();
       var inlineImage = paragraph.appendInlineImage(imageBlob);
@@ -191,14 +154,3 @@ function insertSignatureIntoDoc(docId, imageFileId, party) {
   doc.saveAndClose();
 }
 
-/**
- * 임대인 서명 다이얼로그 열기
- */
-function openLandlordSignatureDialog() {
-  var html = HtmlService.createHtmlOutputFromFile('html/SignaturePage')
-    .setWidth(520)
-    .setHeight(450);
-
-  // 다이얼로그 모드에서는 토큰 대신 직접 호출
-  SpreadsheetApp.getUi().showModalDialog(html, '임대인 서명');
-}

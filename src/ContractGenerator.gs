@@ -98,6 +98,7 @@ function generateContract(rowNumber) {
   // 6. 상태 업데이트
   updateCellValue(rowNumber, '계약서_생성', true);
   updateCellValue(rowNumber, '계약서_문서ID', docId);
+  updateCellValue(rowNumber, '임대인_서명', true);  // 도장 이미지가 템플릿에 포함됨
   updateCellValue(rowNumber, '계약_상태', '검토중');
 
   // 하이퍼링크 수식 설정

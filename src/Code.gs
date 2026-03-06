@@ -46,13 +46,28 @@ function openSettingsSheet() {
  */
 function initializeSheets() {
   var ui = SpreadsheetApp.getUi();
+
+  // 1차 경고
   var response = ui.alert(
-    '시트 초기 설정',
-    '계약목록 시트와 설정 시트를 생성합니다.\n기존 시트가 있으면 건너뜁니다.\n\n계속하시겠습니까?',
+    '⚠️ 시트 초기 설정 - 주의',
+    '이 작업을 실행하면 계약목록 시트와 설정 시트가 삭제 후 재생성됩니다.\n\n'
+    + '⚠️ 기존에 입력된 모든 계약 데이터가 영구 삭제됩니다.\n'
+    + '⚠️ 설정 값도 모두 초기화됩니다.\n\n'
+    + '정말 계속하시겠습니까?',
     ui.ButtonSet.YES_NO
   );
-
   if (response !== ui.Button.YES) return;
+
+  // 2차 최종 확인
+  var finalConfirm = ui.prompt(
+    '🚨 최종 확인',
+    '되돌릴 수 없습니다. 계속하려면 "초기화" 를 입력하세요.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (finalConfirm.getSelectedButton() !== ui.Button.OK || finalConfirm.getResponseText().trim() !== '초기화') {
+    ui.alert('초기 설정이 취소되었습니다.');
+    return;
+  }
 
   initContractSheet();
   initSettingsSheet();

@@ -1,5 +1,6 @@
 docs/**
 node_modules/**
 .git/**
-.claude/**
+.claude/*
+!.claude/skills/
 package.json

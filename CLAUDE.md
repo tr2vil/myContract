@@ -9,7 +9,8 @@
 - **언어**: Google Apps Script (JavaScript, V8 런타임)
 - **개발도구**: clasp CLI (로컬 개발 → GAS 배포)
 - **런타임**: Google Apps Script 서버 (별도 서버 없음)
-- **배포**: `npm run push` (clasp push --force)
+- **배포 (코드 업로드)**: `npm run push` (clasp push --force)
+- **배포 (웹앱 반영)**: `npx clasp deploy -i <deploymentId>` (기존 배포 업데이트)
 - **.clasp.json rootDir**: `src` (src/ 내부 파일만 배포됨)
 - **appsscript.json**: `src/appsscript.json`에 위치 (rootDir 안에 있어야 함)
 
@@ -35,13 +36,11 @@
 onOpen() → 메뉴 등록
 openSidebar() → Sidebar.html 서빙
   Sidebar.html → getSelectedRowSummary() → 행 정보 표시
-  Sidebar.html → generateContractForSelectedRow() → 계약서 생성
+  Sidebar.html → generateContractForSelectedRow() → 계약서 생성 (임대인 서명 자동 삽입)
   Sidebar.html → sendContractEmail(rowNumber) → 이메일 발송
-  Sidebar.html → openLandlordSignatureDialog() → 서명 다이얼로그
 
 doGet(e) → 토큰 검증 → SignaturePage.html 서빙 (웹앱)
   SignaturePage.html → processSignature(token, dataUrl) → 임차인 서명 처리
-  SignaturePage.html → processLandlordSignature(dataUrl) → 임대인 서명 처리 (다이얼로그)
 ```
 
 ### 웹앱 vs 스프레드시트 컨텍스트
@@ -120,19 +119,31 @@ landlord_email     → config.landlordEmail   (임대인 이메일)
 - `clasp logs` → `clasp tail-logs`
 - `clasp deployments` → `clasp list-deployments`
 
-## 서명 페이지 (SignaturePage.html) 이중 모드
+## 서명 페이지 (SignaturePage.html)
 
-하나의 HTML 파일이 두 가지 컨텍스트에서 사용됨:
+웹앱 모드로 임차인 서명 수집에 사용. `doGet()`에서 `createTemplateFromFile()`로 서빙하며 템플릿 변수(`<?= token ?>` 등) 주입.
+임대인 서명은 계약서 생성 시 자동 삽입되므로 별도 서명 UI 불필요.
 
-1. **웹앱 모드** (임차인 서명): `doGet()`에서 `createTemplateFromFile()`로 서빙. 템플릿 변수(`<?= token ?>` 등) 주입. `isWebApp = true`.
-2. **다이얼로그 모드** (임대인 서명): `createHtmlOutputFromFile()`로 서빙. 템플릿 변수 없음 → try/catch로 fallback. `isWebApp = false`.
+## ★ Claude Code 배포 스킬 (필수 사용)
 
-웹앱 모드에서는 `processSignature(token, dataUrl)` 호출, 다이얼로그 모드에서는 `processLandlordSignature(dataUrl)` 호출.
+코드 수정 후 배포 시 **반드시 프로젝트 스킬을 사용**할 것. 직접 clasp 명령어를 실행하지 않는다.
+
+| 스킬 | 용도 | 사용 시점 |
+|------|------|-----------|
+| **`/deploy [설명]`** | push + 웹앱 배포 업데이트 | 웹앱 관련 코드 수정 시 (서명, WebApp.gs 등) |
+| **`/push`** | push만 (HEAD 업데이트) | 스프레드시트 기능만 수정 시 (사이드바, 메뉴 등) |
+
+스킬 정의 파일: `.claude/skills/deploy/SKILL.md`, `.claude/skills/push/SKILL.md`
 
 ## 코드 수정 시 주의사항
 
 1. **getActiveSpreadsheet() 직접 사용 금지** → 반드시 `getSpreadsheet()` 사용 (웹앱 호환)
-2. **push 후 웹앱 반영**: 서버 함수(.gs)는 push만으로 반영되지만, 웹앱 HTML은 **새 배포 필요** (`npm run deploy`)
+2. **push vs deploy (웹앱 배포 주의)**:
+   - `npm run push` (clasp push): HEAD 코드만 업데이트. **스프레드시트 내 기능**(사이드바, 메뉴, 다이얼로그)은 즉시 반영됨.
+   - **웹앱은 배포된 버전(version)을 사용**하므로, push만으로는 웹앱에 반영되지 않음. .gs 서버 함수 변경도 마찬가지.
+   - 웹앱 반영: `npx clasp deploy -i <deploymentId> -d "설명"` 으로 기존 배포를 업데이트해야 함.
+   - 배포 ID 확인: `npm run deployments` (clasp list-deployments)
+   - **요약**: 스프레드시트 기능만 수정 → push만. 웹앱(서명 등) 관련 수정 → push + deploy 필수.
 3. **OAuth 스코프 추가 시**: `src/appsscript.json`의 `oauthScopes`에 추가 후 push → 사용자가 재승인 필요
 4. **컬럼 추가/변경 시**: SheetHelpers.gs의 `CONTRACT_HEADERS` 배열도 동기화 필요
 5. **템플릿 플레이스홀더**: 새 컬럼 추가 시 Google Docs 템플릿에도 `{{새컬럼}}` 추가 필요
@@ -144,3 +155,4 @@ landlord_email     → config.landlordEmail   (임대인 이메일)
 - **appsscript.json not found**: rootDir("src") 안에 위치해야 함
 - **Ui.showSidebar 권한 오류**: `script.container.ui` 스코프 추가로 해결
 - **웹앱에서 "계약목록 시트를 찾을 수 없습니다"**: `getSpreadsheet()` fallback 추가, initSettingsSheet()에서 SPREADSHEET_ID 저장으로 해결
+- **웹앱 코드 변경이 반영되지 않음**: `clasp push`는 HEAD만 업데이트. 웹앱은 배포된 버전을 실행하므로 `npx clasp deploy -i <deploymentId>`로 배포 업데이트 필요

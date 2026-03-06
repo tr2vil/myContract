@@ -293,5 +293,15 @@ function initContractSheet() {
   // 1행 고정
   sheet.setFrozenRows(1);
 
+  // 헤더행 보호 (편집 시 경고 표시)
+  var headerProtection = sheet.getRange(1, 1, 1, CONTRACT_HEADERS.length).protect();
+  headerProtection.setDescription('헤더행 - 수정하지 마세요');
+  headerProtection.setWarningOnly(true);
+
+  // 시스템 컬럼 보호 (편집 시 경고 표시)
+  var systemProtection = sheet.getRange(2, dataColCount + 1, sheet.getMaxRows() - 1, SYSTEM_COLUMNS.length).protect();
+  systemProtection.setDescription('시스템 자동 관리 영역 - 수동 편집하지 마세요');
+  systemProtection.setWarningOnly(true);
+
   SpreadsheetApp.getUi().alert('계약목록 시트가 생성되었습니다.');
 }

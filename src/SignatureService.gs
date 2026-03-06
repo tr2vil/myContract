@@ -119,36 +119,61 @@ function saveSignatureImage(dataUrl, signerName, party) {
 }
 
 /**
- * 서명 이미지를 계약서 문서에 삽입
+ * 서명 이미지를 계약서 문서의 모든 서명란에 삽입
+ * 재귀 순회로 모든 위치를 수집 후, 역순으로 교체 (로그 포함)
+ *
  * @param {string} docId - Google Docs 문서 ID
  * @param {string} imageFileId - Drive 서명 이미지 파일 ID
  * @param {string} party - '임대인' 또는 '임차인'
  */
 function insertSignatureIntoDoc(docId, imageFileId, party) {
+  var placeholder = party === '임대인' ? '[임대인 서명란]' : '[임차인 서명란]';
+
   var doc = DocumentApp.openById(docId);
   var body = doc.getBody();
 
-  var placeholder = party === '임대인' ? '\\[임대인 서명란\\]' : '\\[임차인 서명란\\]';
-  var imageBlob = DriveApp.getFileById(imageFileId).getBlob();
-
-  // 모든 서명란을 찾아서 각각 이미지 삽입
-  var searchResult;
-  while ((searchResult = body.findText(placeholder)) !== null) {
-    var element = searchResult.getElement();
-    var parent = element.getParent();
-
-    // 플레이스홀더 텍스트 제거
-    var start = searchResult.getStartOffset();
-    var end = searchResult.getEndOffsetInclusive();
-    element.asText().deleteText(start, end);
-
-    // 서명 이미지 삽입
-    if (parent.getType() === DocumentApp.ElementType.PARAGRAPH) {
-      var paragraph = parent.asParagraph();
-      var inlineImage = paragraph.appendInlineImage(imageBlob);
-      inlineImage.setWidth(150);
-      inlineImage.setHeight(60);
+  // 재귀 순회로 모든 서명란 위치 수집
+  var targets = [];
+  function collect(el) {
+    var type = el.getType();
+    if (type === DocumentApp.ElementType.TABLE) {
+      var table = el.asTable();
+      for (var r = 0; r < table.getNumRows(); r++) {
+        var row = table.getRow(r);
+        for (var c = 0; c < row.getNumCells(); c++) {
+          var cell = row.getCell(c);
+          for (var p = 0; p < cell.getNumChildren(); p++) {
+            collect(cell.getChild(p));
+          }
+        }
+      }
+    } else if (type === DocumentApp.ElementType.PARAGRAPH) {
+      if (el.asParagraph().getText().indexOf(placeholder) !== -1) {
+        targets.push(el.asParagraph());
+      }
+    } else if (type === DocumentApp.ElementType.LIST_ITEM) {
+      if (el.asListItem().getText().indexOf(placeholder) !== -1) {
+        targets.push(el.asListItem());
+      }
     }
+  }
+  for (var i = 0; i < body.getNumChildren(); i++) {
+    collect(body.getChild(i));
+  }
+
+  // 역순으로 교체 (인덱스 변동 방지)
+  for (var j = targets.length - 1; j >= 0; j--) {
+    var para = targets[j];
+    var text = para.getText();
+    var idx = text.indexOf(placeholder);
+    if (idx === -1) continue;
+
+    para.editAsText().deleteText(idx, idx + placeholder.length - 1);
+
+    var freshBlob = DriveApp.getFileById(imageFileId).getBlob();
+    var img = para.insertInlineImage(0, freshBlob);
+    img.setWidth(150);
+    img.setHeight(60);
   }
 
   doc.saveAndClose();

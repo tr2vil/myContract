@@ -16,6 +16,11 @@ function onOpen() {
     .addItem('시트 초기 설정', 'initializeSheets')
     .addItem('설정 열기', 'openSettingsSheet')
     .addToUi();
+
+  // 열 때 계약목록 시트를 기본으로 표시
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var contractSheet = ss.getSheetByName('계약목록');
+  if (contractSheet) ss.setActiveSheet(contractSheet);
 }
 
 /**

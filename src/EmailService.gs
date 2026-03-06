@@ -58,10 +58,26 @@ function sendContractEmail(rowNumber) {
     landlordPhone: config.landlordPhone
   });
 
+  // 첨부파일 준비
+  var attachments = [];
+  if (config.attachmentFileIds) {
+    config.attachmentFileIds.split(',').forEach(function(id) {
+      id = id.trim();
+      if (id) {
+        try {
+          attachments.push(DriveApp.getFileById(id).getBlob());
+        } catch (e) {
+          Logger.log('첨부파일 로드 실패 (ID: ' + id + '): ' + e.message);
+        }
+      }
+    });
+  }
+
   // 이메일 발송
   GmailApp.sendEmail(recipientEmail, subject, '', {
     htmlBody: htmlBody,
-    name: senderName
+    name: senderName,
+    attachments: attachments
   });
 
   // 상태 업데이트

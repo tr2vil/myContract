@@ -41,7 +41,8 @@ function getConfig() {
     landlordName: raw['landlord_name'] || '',
     landlordPhone: raw['landlord_phone'] || '',
     landlordEmail: raw['landlord_email'] || '',
-    smsTemplate: raw['sms_template'] || '[{{지점명}}] 임대차계약서 서명 요청\n{{이름}}님, 계약서 확인 및 서명을 부탁드립니다.\n{{서명링크}}'
+    smsTemplate: raw['sms_template'] || '[{{지점명}}] 임대차계약서 서명 요청\n{{이름}}님, 계약서 확인 및 서명을 부탁드립니다.\n{{서명링크}}',
+    attachmentFileIds: raw['attachment_file_ids'] || ''
   };
 }
 
@@ -97,7 +98,8 @@ function initSettingsSheet() {
     ['landlord_name', '', '임대인(갑) 이름'],
     ['landlord_phone', '', '임대인 연락처'],
     ['landlord_email', '', '임대인 이메일'],
-    ['sms_template', '[{{지점명}}] 임대차계약서 서명 요청\n{{이름}}님, 계약서 확인 및 서명을 부탁드립니다.\n{{서명링크}}', 'SMS 문자 템플릿 ({{이름}}, {{지점명}}, {{서명링크}} 등 사용 가능)']
+    ['sms_template', '[{{지점명}}] 임대차계약서 서명 요청\n{{이름}}님, 계약서 확인 및 서명을 부탁드립니다.\n{{서명링크}}', 'SMS 문자 템플릿 ({{이름}}, {{지점명}}, {{서명링크}} 등 사용 가능)'],
+    ['attachment_file_ids', '', '이메일 첨부파일 Drive 파일 ID (쉼표로 구분)']
   ];
   sheet.getRange(2, 1, settings.length, 3).setValues(settings);
 

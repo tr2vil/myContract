@@ -20,14 +20,14 @@
 
 | 파일 | 역할 | 의존 |
 |------|------|------|
-| Code.gs | 진입점. onOpen()으로 커스텀 메뉴 등록, 사이드바/다이얼로그 열기 | SheetHelpers, Config |
+| Code.gs | 진입점. onOpen()으로 커스텀 메뉴 등록, 사이드바/다이얼로그 열기, goToRow() | SheetHelpers, Config |
 | Config.gs | 설정 시트 CRUD. getConfig()로 설정값 객체 반환 | SheetHelpers (getSpreadsheet) |
-| SheetHelpers.gs | 데이터 접근 계층. 행 데이터 읽기, 컬럼 매핑, 상태 업데이트. getSpreadsheet() 정의 | 없음 (최하위 모듈) |
+| SheetHelpers.gs | 데이터 접근 계층. 행 데이터 읽기, 컬럼 매핑, 상태 업데이트, 만료 임박 조회. getSpreadsheet() 정의 | 없음 (최하위 모듈) |
 | ContractGenerator.gs | Docs 템플릿 복사 → 플레이스홀더 치환 → 계약서 생성, 임대인 서명 자동 삽입 | Config, SheetHelpers |
 | EmailService.gs | GmailApp으로 이메일 발송 (계약요청 + 최종계약서), SMS 텍스트 생성 | Config, SheetHelpers, SignatureService |
 | SignatureService.gs | 서명 토큰 생성, 서명/신분증 이미지 → Drive 저장, Docs에 서명/신분증 삽입 | Config, SheetHelpers |
 | WebApp.gs | doGet(e) 웹앱 핸들러. 토큰 검증 후 서명 페이지 서빙 | SignatureService, SheetHelpers |
-| html/Sidebar.html | 사이드바 UI. google.script.run으로 서버 함수 호출 | - |
+| html/Sidebar.html | 사이드바 UI. 만료 임박 목록 + 선택 행 작업. google.script.run으로 서버 함수 호출 | - |
 | html/SignaturePage.html | 서명 캔버스 + 신분증 업로드 UI. 웹앱 모드로 동작 (isWebApp 플래그) | - |
 
 ### 함수 호출 관계
@@ -35,10 +35,12 @@
 ```
 onOpen() → 메뉴 등록
 openSidebar() → Sidebar.html 서빙
+  Sidebar.html → getExpiringContracts() → 만료 임박 목록 표시 (만료 7일전 ~ 만료 후 14일)
   Sidebar.html → getSelectedRowSummary() → 행 정보 표시
   Sidebar.html → generateContractForSelectedRow() → 계약서 생성 (임대인 서명 자동 삽입)
   Sidebar.html → sendContractEmail(rowNumber) → 계약요청 이메일 발송 (첨부파일 포함)
   Sidebar.html → sendCompletionEmail(rowNumber) → 최종계약서 이메일 발송 (임대인 확인 후)
+  Sidebar.html → goToRow(rowNumber) → 만료 임박 항목 클릭 시 해당 행 이동
 
 doGet(e) → 토큰 검증 → SignaturePage.html 서빙 (웹앱)
   SignaturePage.html → processSignature(token, dataUrl, idCardDataUrl) → 서명+신분증 처리

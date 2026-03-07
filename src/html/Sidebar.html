@@ -120,6 +120,60 @@
       padding: 40px;
       color: #999;
     }
+
+    .expiring-section {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .expiring-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #ea4335;
+      margin-bottom: 10px;
+    }
+    .expiring-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+    .expiring-item:hover { background: #f5f5f5; }
+    .expiring-item:last-child { margin-bottom: 0; }
+    .d-day-badge {
+      flex-shrink: 0;
+      display: inline-block;
+      min-width: 42px;
+      text-align: center;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .d-day-urgent { background: #ea4335; }
+    .d-day-warn { background: #ff9800; }
+    .d-day-over { background: #b71c1c; }
+    .expiring-info {
+      flex: 1;
+      font-size: 12px;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .expiring-empty {
+      font-size: 12px;
+      color: #999;
+      text-align: center;
+      padding: 8px 0;
+    }
   </style>
 </head>
 <body>
@@ -129,6 +183,11 @@
   </div>
 
   <div id="loading" class="loading">정보를 불러오는 중...</div>
+
+  <div id="expiringSection" class="expiring-section" style="display:none;">
+    <div class="expiring-title" id="expiringTitle">만료 임박</div>
+    <div id="expiringList"></div>
+  </div>
 
   <div id="content" style="display:none;">
     <!-- 계약 정보 요약 -->
@@ -198,7 +257,7 @@
       </li>
     </ul>
 
-    <button class="btn btn-refresh" onclick="loadData()" style="width:100%; margin-top: 12px;">
+    <button class="btn btn-refresh" onclick="loadData(); loadExpiringContracts();" style="width:100%; margin-top: 12px;">
       새로고침
     </button>
   </div>
@@ -212,6 +271,7 @@
     // 페이지 로드 시 데이터 가져오기
     window.onload = function() {
       loadData();
+      loadExpiringContracts();
     };
 
     function loadData() {
@@ -400,6 +460,61 @@
       if (type !== 'info') {
         setTimeout(function() { el.style.display = 'none'; }, 5000);
       }
+    }
+
+    function loadExpiringContracts() {
+      google.script.run
+        .withSuccessHandler(onExpiringLoaded)
+        .withFailureHandler(function() {})
+        .getExpiringContracts();
+    }
+
+    function onExpiringLoaded(list) {
+      var section = document.getElementById('expiringSection');
+      var container = document.getElementById('expiringList');
+
+      if (!list || list.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      document.getElementById('expiringTitle').textContent = '만료 임박 (' + list.length + '건)';
+      container.innerHTML = '';
+
+      list.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'expiring-item';
+        div.onclick = function() {
+          google.script.run
+            .withSuccessHandler(function() { loadData(); })
+            .goToRow(item.rowNumber);
+        };
+
+        var badge = document.createElement('span');
+        var dDayText;
+        if (item.dDay < 0) {
+          dDayText = 'D+' + Math.abs(item.dDay);
+          badge.className = 'd-day-badge d-day-over';
+        } else if (item.dDay <= 3) {
+          dDayText = item.dDay === 0 ? 'D-Day' : 'D-' + item.dDay;
+          badge.className = 'd-day-badge d-day-urgent';
+        } else {
+          dDayText = 'D-' + item.dDay;
+          badge.className = 'd-day-badge d-day-warn';
+        }
+        badge.textContent = dDayText;
+
+        var info = document.createElement('span');
+        info.className = 'expiring-info';
+        var loc = (item['층'] ? item['층'] + '층 ' : '') + (item['호수'] ? item['호수'] + '호' : '');
+        info.textContent = (loc ? loc + ' | ' : '') + item['이름'] + (item['상호'] ? ' (' + item['상호'] + ')' : '');
+
+        div.appendChild(badge);
+        div.appendChild(info);
+        container.appendChild(div);
+      });
+
+      section.style.display = 'block';
     }
 
     function onError(err) {

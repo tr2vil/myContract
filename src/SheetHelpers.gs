@@ -239,6 +239,59 @@ function numberToKorean(num) {
 }
 
 /**
+ * 만료 임박 계약 목록을 반환 (D-day -14 ~ +7)
+ * 계약만료일이 있는 모든 행 대상 (상태 무관)
+ * @returns {Array<Object>} [{ rowNumber, 상호, 이름, 층, 호수, dDay, 계약만료일, 연락처 }]
+ */
+function getExpiringContracts() {
+  var sheet = getContractSheet();
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  var headers = data[0];
+  var colIdx = {};
+  headers.forEach(function(h, i) { if (h) colIdx[String(h).trim()] = i; });
+
+  // 오늘 날짜 (Asia/Seoul 기준 midnight)
+  var todayStr = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  var today = new Date(todayStr + 'T00:00:00+09:00');
+
+  var results = [];
+  for (var r = 1; r < data.length; r++) {
+    var rawDate = data[r][colIdx['계약만료일']];
+    if (!rawDate) continue;
+
+    var expiryDate;
+    if (rawDate instanceof Date) {
+      var ds = Utilities.formatDate(rawDate, 'Asia/Seoul', 'yyyy-MM-dd');
+      expiryDate = new Date(ds + 'T00:00:00+09:00');
+    } else {
+      var m = String(rawDate).match(/(\d{4})년?\s*(\d{1,2})월?\s*(\d{1,2})일?/);
+      if (!m) continue;
+      expiryDate = new Date(m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) + 'T00:00:00+09:00');
+    }
+
+    var dDay = Math.ceil((expiryDate - today) / 86400000);
+    if (dDay < -14 || dDay > 7) continue;
+
+    var formatted = Utilities.formatDate(expiryDate, 'Asia/Seoul', 'yyyy-MM-dd');
+    results.push({
+      rowNumber: r + 1,
+      상호: data[r][colIdx['상호']] || '',
+      이름: data[r][colIdx['이름']] || '',
+      층: data[r][colIdx['층']] || '',
+      호수: data[r][colIdx['호수']] || '',
+      dDay: dDay,
+      계약만료일: formatted,
+      연락처: data[r][colIdx['연락처']] || ''
+    });
+  }
+
+  results.sort(function(a, b) { return a.dDay - b.dDay; });
+  return results;
+}
+
+/**
  * 계약목록 시트 초기 구조를 생성 (최초 1회 실행)
  */
 function initContractSheet() {

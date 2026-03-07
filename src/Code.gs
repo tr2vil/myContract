@@ -97,6 +97,15 @@ function initializeSheets() {
 }
 
 /**
+ * 특정 행으로 이동 (사이드바에서 호출)
+ * @param {number} rowNumber - 이동할 행 번호
+ */
+function goToRow(rowNumber) {
+  var sheet = getContractSheet();
+  sheet.getRange(rowNumber, 1).activate();
+}
+
+/**
  * HTML 파일 인클루드 (CSS/JS 분리 시 사용)
  * @param {string} filename - 포함할 HTML 파일명
  * @returns {string} HTML 내용

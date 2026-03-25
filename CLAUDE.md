@@ -49,7 +49,7 @@ doGet(e) → 토큰 검증 → SignaturePage.html 서빙 (웹앱)
 ### 계약 상태 흐름
 
 ```
-작성중 → [계약서 생성] → 작성중
+작성중 → [계약서 생성] → 검토중
        → [이메일 발송] → 서명대기
        → [임차인 서명+신분증] → 서명완료
        → [임대인 확인 → 최종계약서 발송] → 완료
@@ -151,6 +151,7 @@ attachment_file_ids  → config.attachmentFileIds      (이메일 첨부파일 D
 ## 이메일 기능
 
 ### 계약요청 이메일 (sendContractEmail)
+- **계약서 PDF 자동 첨부**: Google Docs를 PDF로 변환하여 첨부 (Google 계정 없는 임차인도 계약서 검토 가능)
 - 계약서 검토 링크 + 전자서명 링크 포함
 - `attachment_file_ids` 설정의 파일을 첨부 (예: 전대동의서.pdf)
 - 상태를 '서명대기'로 변경

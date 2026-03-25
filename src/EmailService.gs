@@ -234,9 +234,18 @@ function sendCompletionEmail(rowNumber) {
     landlordPhone: config.landlordPhone
   });
 
+  // 완료된 계약서 PDF 첨부
+  var attachments = [];
+  if (docId) {
+    var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
+    pdfBlob.setName(rowData['이름'] + '_계약서(완료).pdf');
+    attachments.push(pdfBlob);
+  }
+
   GmailApp.sendEmail(recipientEmail, subject, '', {
     htmlBody: htmlBody,
-    name: senderName
+    name: senderName,
+    attachments: attachments
   });
 
   updateCellValue(rowNumber, '완료이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));

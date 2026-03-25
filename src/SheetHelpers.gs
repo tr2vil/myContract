@@ -339,7 +339,7 @@ function initContractSheet() {
 
   // 계약_상태 드롭다운
   var statusOptions = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['작성중', '검토중', '서명대기', '완료'], true)
+    .requireValueInList(['작성중', '검토중', '서명대기', '서명완료', '완료'], true)
     .build();
   sheet.getRange(2, cols['계약_상태'], 100, 1).setDataValidation(statusOptions);
 

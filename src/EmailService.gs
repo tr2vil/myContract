@@ -58,8 +58,13 @@ function sendContractEmail(rowNumber) {
     landlordPhone: config.landlordPhone
   });
 
-  // 첨부파일 준비
+  // 계약서 PDF 첨부
   var attachments = [];
+  var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
+  pdfBlob.setName(rowData['이름'] + '_계약서.pdf');
+  attachments.push(pdfBlob);
+
+  // 추가 첨부파일 준비
   if (config.attachmentFileIds) {
     config.attachmentFileIds.split(',').forEach(function(id) {
       id = id.trim();

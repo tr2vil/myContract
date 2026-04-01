@@ -90,8 +90,8 @@ function generateContract(rowNumber) {
   doc.saveAndClose();
 
   // 5. 임차인에게 뷰어 권한 부여
-  var tenantEmail = rowData['이메일'];
-  if (tenantEmail) {
+  var tenantEmail = (rowData['이메일'] || '').toString().trim();
+  if (tenantEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tenantEmail)) {
     copiedFile.addViewer(tenantEmail);
   }
 

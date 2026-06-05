@@ -115,6 +115,43 @@
     .msg-error { background: #fce4ec; color: #c62828; }
     .msg-info { background: #e3f2fd; color: #1565c0; }
 
+    /* SMS 수동 복사 폴백 모달 */
+    .sms-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .sms-modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      max-width: 100%;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    .sms-modal h3 { margin: 0 0 8px; font-size: 14px; color: #333; }
+    .sms-modal p { margin: 0 0 8px; font-size: 12px; color: #666; }
+    .sms-modal textarea {
+      width: 100%;
+      min-height: 140px;
+      box-sizing: border-box;
+      font-size: 13px;
+      font-family: inherit;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+    }
+    .sms-modal .sms-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .sms-modal .sms-actions .btn { margin: 0; }
+
     .loading {
       text-align: center;
       padding: 40px;
@@ -263,6 +300,19 @@
   </div>
 
   <div id="message"></div>
+
+  <!-- SMS 수동 복사 폴백 모달 (자동 복사가 차단된 환경용) -->
+  <div class="sms-overlay" id="smsOverlay">
+    <div class="sms-modal">
+      <h3>SMS 문자 복사</h3>
+      <p>아래 내용을 길게 눌러 전체 선택 후 복사하세요.<br>연락처: <span id="smsPhone"></span></p>
+      <textarea id="smsTextArea" readonly></textarea>
+      <div class="sms-actions">
+        <button class="btn btn-sms" onclick="retrySmsCopy()" style="flex:1;">다시 복사 시도</button>
+        <button class="btn btn-refresh" onclick="closeSmsModal()" style="flex:1;">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     var currentData = null;
@@ -424,21 +474,87 @@
       setButtonLoading('btnSms', true, '생성 중...');
       google.script.run
         .withSuccessHandler(function(text) {
-          // 클립보드에 복사
-          var ta = document.createElement('textarea');
-          ta.value = text;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
           setButtonLoading('btnSms', false, 'SMS 문자 복사');
-          showMessage('SMS 문자가 클립보드에 복사되었습니다!\n연락처: ' + (currentData.tenantPhone || '(미입력)'), 'success');
+          copySmsText(text);
         })
         .withFailureHandler(function(err) {
           setButtonLoading('btnSms', false, 'SMS 문자 복사');
           onError(err);
         })
         .getSmsText(currentData.rowNumber);
+    }
+
+    // 클립보드 복사 시도 → 실패 시 수동 복사 모달 표시
+    // GAS 사이드바는 샌드박스 iframe이라 브라우저/환경에 따라 자동 복사가 차단될 수 있음
+    function copySmsText(text) {
+      var phone = (currentData && currentData.tenantPhone) || '(미입력)';
+
+      // 1순위: navigator.clipboard (권한 허용 시 동작)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          showMessage('SMS 문자가 클립보드에 복사되었습니다!\n연락처: ' + phone, 'success');
+        }).catch(function() {
+          // 2순위: execCommand 시도, 그래도 안 되면 모달
+          if (!legacyCopy(text)) {
+            openSmsModal(text, phone);
+          } else {
+            showMessage('SMS 문자가 클립보드에 복사되었습니다!\n연락처: ' + phone, 'success');
+          }
+        });
+        return;
+      }
+
+      // navigator.clipboard 미지원 환경
+      if (legacyCopy(text)) {
+        showMessage('SMS 문자가 클립보드에 복사되었습니다!\n연락처: ' + phone, 'success');
+      } else {
+        openSmsModal(text, phone);
+      }
+    }
+
+    // 구형 execCommand 복사. 성공 여부를 반환값으로 확인 (실패 시 false)
+    function legacyCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } catch (e) {
+        ok = false;
+      }
+      document.body.removeChild(ta);
+      return ok;
+    }
+
+    // 자동 복사가 막힌 환경: 텍스트를 보여주고 사용자가 직접 복사하도록 함
+    function openSmsModal(text, phone) {
+      document.getElementById('smsTextArea').value = text;
+      document.getElementById('smsPhone').textContent = phone;
+      document.getElementById('smsOverlay').style.display = 'block';
+      var ta = document.getElementById('smsTextArea');
+      ta.focus();
+      ta.select();
+    }
+
+    function retrySmsCopy() {
+      var ta = document.getElementById('smsTextArea');
+      ta.focus();
+      ta.select();
+      if (legacyCopy(ta.value)) {
+        closeSmsModal();
+        showMessage('SMS 문자가 클립보드에 복사되었습니다!', 'success');
+      } else {
+        showMessage('자동 복사가 차단된 환경입니다. 텍스트를 직접 선택해 복사하세요.', 'info');
+      }
+    }
+
+    function closeSmsModal() {
+      document.getElementById('smsOverlay').style.display = 'none';
     }
 
     function setButtonLoading(id, loading, text) {

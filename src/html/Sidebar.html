@@ -109,11 +109,13 @@
       padding: 10px;
       border-radius: 6px;
       font-size: 12px;
+      white-space: pre-line;
       display: none;
     }
     .msg-success { background: #e8f5e9; color: #2e7d32; }
     .msg-error { background: #fce4ec; color: #c62828; }
     .msg-info { background: #e3f2fd; color: #1565c0; }
+    .msg-warning { background: #fff8e1; color: #e65100; }
 
     /* SMS 수동 복사 폴백 모달 */
     .sms-overlay {
@@ -434,9 +436,9 @@
       showMessage('이메일을 발송하고 있습니다...', 'info');
 
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function(result) {
           setButtonLoading('btnEmail', false, '이메일 발송');
-          showMessage('이메일이 발송되었습니다!', 'success');
+          showEmailResult('이메일이 발송되었습니다!', result);
           loadData();
         })
         .withFailureHandler(function(err) {
@@ -458,9 +460,9 @@
       showMessage('최종계약서 이메일을 발송하고 있습니다...', 'info');
 
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function(result) {
           setButtonLoading('btnCompleteEmail', false, '최종계약서 이메일 전송');
-          showMessage('최종계약서 이메일이 발송되었습니다!', 'success');
+          showEmailResult('최종계약서 이메일이 발송되었습니다!', result);
           loadData();
         })
         .withFailureHandler(function(err) {
@@ -573,8 +575,19 @@
       el.textContent = text;
       el.className = 'msg-' + type;
       el.style.display = 'block';
-      if (type !== 'info') {
+      // info/warning은 사용자가 읽을 수 있도록 자동으로 숨기지 않음
+      if (type !== 'info' && type !== 'warning') {
         setTimeout(function() { el.style.display = 'none'; }, 5000);
+      }
+    }
+
+    // 이메일 발송 결과 표시. PDF 첨부가 생략된 경우 경고로 알린다
+    function showEmailResult(successText, result) {
+      if (result && result.pdfAttached === false) {
+        showMessage(successText + '\n단, 계약서 PDF 변환이 반복 실패해 PDF 첨부 없이 발송되었습니다. '
+          + '임차인은 이메일의 계약서 링크로 내용을 확인할 수 있습니다.', 'warning');
+      } else {
+        showMessage(successText, 'success');
       }
     }
 

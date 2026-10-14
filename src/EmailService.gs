@@ -4,9 +4,43 @@
  * 임차인에게 계약서 검토 및 서명 요청 이메일을 발송한다.
  */
 
+// PDF 변환 재시도 설정 (Google 변환 서비스의 일시 오류 대응)
+var PDF_EXPORT_MAX_ATTEMPTS = 3;
+var PDF_EXPORT_RETRY_DELAY_MS = 1500;
+
+/**
+ * 계약서 Docs를 PDF Blob으로 변환 (실패 시 재시도, 끝까지 실패하면 null)
+ * PDF 첨부는 부가 기능이므로 변환 실패가 이메일 발송 자체를 막지 않도록 한다.
+ * @param {string} docId - 계약서 문서 ID
+ * @param {string} fileName - 첨부 파일명
+ * @returns {GoogleAppsScript.Base.Blob|null} PDF Blob 또는 null
+ */
+function buildContractPdfBlob(docId, fileName) {
+  if (!docId) return null;
+
+  var lastError = null;
+  for (var attempt = 1; attempt <= PDF_EXPORT_MAX_ATTEMPTS; attempt++) {
+    try {
+      var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
+      pdfBlob.setName(fileName);
+      return pdfBlob;
+    } catch (e) {
+      lastError = e;
+      Logger.log('PDF 변환 실패 (' + attempt + '/' + PDF_EXPORT_MAX_ATTEMPTS + ', docId=' + docId + '): ' + e.message);
+      if (attempt < PDF_EXPORT_MAX_ATTEMPTS) {
+        Utilities.sleep(PDF_EXPORT_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  Logger.log('PDF 변환 최종 실패, PDF 없이 발송합니다 (docId=' + docId + '): ' + (lastError && lastError.message));
+  return null;
+}
+
 /**
  * 지정된 행의 임차인에게 계약서 이메일 발송
  * @param {number} rowNumber - 1-based 행 번호
+ * @returns {{pdfAttached: boolean, recipientEmail: string}} 발송 결과
  */
 function sendContractEmail(rowNumber) {
   var config = getConfig();
@@ -58,15 +92,14 @@ function sendContractEmail(rowNumber) {
     landlordPhone: config.landlordPhone
   });
 
-  // 계약서 PDF 첨부
+  // 계약서 PDF 첨부 (변환 실패 시 재시도 후 PDF 없이 발송)
   var attachments = [];
-  var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
-  pdfBlob.setName(rowData['이름'] + '_계약서.pdf');
-  attachments.push(pdfBlob);
+  var pdfBlob = buildContractPdfBlob(docId, rowData['이름'] + '_계약서.pdf');
+  if (pdfBlob) attachments.push(pdfBlob);
 
   // 추가 첨부파일 준비
   if (config.attachmentFileIds) {
-    config.attachmentFileIds.split(',').forEach(function(id) {
+    String(config.attachmentFileIds).split(',').forEach(function(id) {
       id = id.trim();
       if (id) {
         try {
@@ -85,11 +118,12 @@ function sendContractEmail(rowNumber) {
     attachments: attachments
   });
 
-  // 상태 업데이트
+  // 상태 업데이트 - 발송 직후 계약_상태를 먼저 기록해 재시도 시 중복 발송을 막는다
+  updateCellValue(rowNumber, '계약_상태', '서명대기');
   updateCellValue(rowNumber, '이메일_발송', true);
   updateCellValue(rowNumber, '이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
-  updateCellValue(rowNumber, '서명_토큰', token);
-  updateCellValue(rowNumber, '계약_상태', '서명대기');
+
+  return { pdfAttached: !!pdfBlob, recipientEmail: recipientEmail };
 }
 
 /**
@@ -204,13 +238,16 @@ function buildEmailHtml(data) {
 /**
  * 서명 완료 후 임차인에게 완료 안내 이메일 발송
  * @param {number} rowNumber - 행 번호
+ * @returns {{pdfAttached: boolean, recipientEmail: string}} 발송 결과
  */
 function sendCompletionEmail(rowNumber) {
   var config = getConfig();
   var rowData = getRowData(rowNumber);
 
   var recipientEmail = rowData['이메일'];
-  if (!recipientEmail) return;
+  if (!recipientEmail) {
+    throw new Error('이메일이 입력되지 않았습니다.');
+  }
 
   var recipientName = rowData['이름'];
   var senderName = config.senderName || config.landlordName;
@@ -234,13 +271,10 @@ function sendCompletionEmail(rowNumber) {
     landlordPhone: config.landlordPhone
   });
 
-  // 완료된 계약서 PDF 첨부
+  // 완료된 계약서 PDF 첨부 (변환 실패 시 재시도 후 PDF 없이 발송)
   var attachments = [];
-  if (docId) {
-    var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
-    pdfBlob.setName(rowData['이름'] + '_계약서(완료).pdf');
-    attachments.push(pdfBlob);
-  }
+  var pdfBlob = buildContractPdfBlob(docId, rowData['이름'] + '_계약서(완료).pdf');
+  if (pdfBlob) attachments.push(pdfBlob);
 
   GmailApp.sendEmail(recipientEmail, subject, '', {
     htmlBody: htmlBody,
@@ -248,8 +282,11 @@ function sendCompletionEmail(rowNumber) {
     attachments: attachments
   });
 
-  updateCellValue(rowNumber, '완료이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
+  // 상태 업데이트 - 발송 직후 계약_상태를 먼저 기록해 재시도 시 중복 발송을 막는다
   updateCellValue(rowNumber, '계약_상태', '완료');
+  updateCellValue(rowNumber, '완료이메일_발송일', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'));
+
+  return { pdfAttached: !!pdfBlob, recipientEmail: recipientEmail };
 }
 
 /**
